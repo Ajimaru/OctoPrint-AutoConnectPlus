@@ -2,19 +2,21 @@
 
 ########################################################################################################################
 
-plugin_identifier = "portretryplus"
-plugin_package = "octoprint_portretryplus"
-plugin_name = "OctoPrint-PortRetryPlus"
+plugin_identifier = "autoconnectplus"
+plugin_package = "octoprint_autoconnectplus"
+plugin_name = "OctoPrint-AutoConnectPlus"
 plugin_version = "1.0.0"
 plugin_description = (
-    """PortRetryPlus retries the serial connection when the printer disconnects"""
+    """Automatically reconnects the printer over serial, Moonraker or Bambu connectors"""
 )
-plugin_author = "hprombex"
-plugin_author_email = "henryk.rombel@gmail.com"
-plugin_url = "https://github.com/hprombex/OctoPrint-PortRetryPlus"
+plugin_author = "ajimaru"
+plugin_author_email = "ajimaru_gdr@pm.me"
+plugin_url = "https://github.com/ajimaru/OctoPrint-AutoConnectPlus"
 plugin_license = "AGPLv3"
 
-# Any additional requirements besides OctoPrint should be listed here
+# Any additional requirements besides OctoPrint should be listed here.
+# NOTE: Bambu support relies on `bpm` (bambu-printer-manager) which is provided by
+# the OctoPrint-BambuConnector plugin. It is intentionally NOT declared here.
 plugin_requires = []
 
 ### --------------------------------------------------------------------------------------------------------------------
@@ -35,11 +37,6 @@ plugin_ignored_packages = []
 # define dependency links or other things like that, this is the place to go. Will be merged recursively with the
 # default setup parameters as provided by octoprint_setuptools.create_plugin_setup_parameters using
 # octoprint.util.dict_merge.
-#
-# Example:
-#     plugin_requires = ["someDependency==dev"]
-#     additional_setup_parameters = {"dependency_links": ["https://github.com/someUser/someRepo/archive/master.zip#egg=someDependency-dev"]}
-plugin_requires = []
 additional_setup_parameters = {}
 
 ########################################################################################################################

@@ -1,18 +1,18 @@
 ---
 layout: plugin
 
-id: portretryplus
-title: OctoPrint-PortRetryPlus
-description: PortRetryPlus retries the serial connection on a configurable interval when the printer disconnects
-author: hprombex
+id: autoconnectplus
+title: OctoPrint-AutoConnectPlus
+description: Automatically reconnects the printer over serial, Moonraker or Bambu connectors on a configurable interval
+author: ajimaru
 license: AGPLv3
 
 # today's date in format YYYY-MM-DD
-date: 2024-09-15
+date: 2026-06-17
 
-homepage: https://github.com/hprombex/OctoPrint-PortRetryPlus
-source: https://github.com/hprombex/OctoPrint-PortRetryPlus
-archive: https://github.com/hprombex/OctoPrint-PortRetryPlus/archive/main.zip
+homepage: https://github.com/ajimaru/OctoPrint-AutoConnectPlus
+source: https://github.com/ajimaru/OctoPrint-AutoConnectPlus
+archive: https://github.com/ajimaru/OctoPrint-AutoConnectPlus/archive/main.zip
 
 # Set this if your plugin heavily interacts with any kind of cloud services.
 #privacypolicy: your plugin's privacy policy URL
@@ -24,15 +24,14 @@ archive: https://github.com/hprombex/OctoPrint-PortRetryPlus/archive/main.zip
 tags:
 - disconnect
 - recovery
+- moonraker
+- bambu
+- connector
 
 #screenshots:
 #- url: url of a screenshot, /assets/img/...
 #  alt: alt-text of a screenshot
 #  caption: caption of a screenshot
-#- url: url of another screenshot, /assets/img/...
-#  alt: alt-text of another screenshot
-#  caption: caption of another screenshot
-#- ...
 
 #featuredimage: url of a featured image for your plugin, /assets/img/...
 
@@ -79,16 +78,6 @@ compatibility:
   #- freebsd
 
   # Compatible Python version
-  #
-  # Plugins should aim for compatibility for Python 2 and 3 for now, in which case the value should be ">=2.7,<4".
-  #
-  # Plugins that only wish to support Python 3 should set it to ">=3,<4".
-  #
-  # If your plugin only supports Python 2 it will no longer be accepted on the plugin repository.
-  #
-  # Uncomment the appropriate setting
-
-  #python: ">=2.7,<3" # Python 2 & 3
   python: ">=3,<4" # Python 3 only
 
 # TODO
@@ -100,28 +89,41 @@ compatibility:
 #  - free-tier  # if your plugin has a free tier
 ---
 
-When the printer is disconnected, this plugin will try to reconnect the printer on a configurable interval
+When the printer is disconnected, this plugin will try to reconnect it on a
+configurable interval — not only over **serial**, but also through the OctoPrint 2.0
+**connector framework** for **Moonraker (Klipper)** and **Bambu** printers.
 
-Comes in handy when running octoprint in an lxc, and the port device is available even if the printer is not connected.
+AutoConnectPlus is a fork of [OctoPrint-PortRetryPlus](https://github.com/hprombex/OctoPrint-PortRetryPlus)
+by hprombex (with earlier work credited to vehystrix). The serial retry/timer logic is
+carried over; the Moonraker/Bambu connector support is new.
 
-Should also work to solve the issue with Prusa printers that don't remove the serial port from the system when powering down
+## Requirements
 
-Caveats: only tested on OctoPrint 1.10.2, python 3 and on linux
+- **Serial** mode works on any reasonably recent OctoPrint.
+- **Moonraker / Bambu** modes require **OctoPrint 2.0+** (the connector framework) and
+  the matching connector plugin installed (OctoPrint-MoonrakerConnector /
+  OctoPrint-BambuConnector). Bambu's `bpm` dependency comes from the BambuConnector
+  plugin; AutoConnectPlus does not install it itself.
 
 ## Configuration
 
-In ~/.octoprint/config.yaml, the interval can be configured to something other than the default 5 seconds.
-There is also a settings page in the webui
+Configure via **Settings → AutoConnectPlus**, or in `~/.octoprint/config.yaml`:
+
 ```
 plugins:
-  portretryplus:
+  autoconnectplus:
+    connection_type: serial   # serial | moonraker | bambu
     interval: 5
-    force_port: /dev/ttyUSB0
+    forced_port: /dev/ttyUSB0
+    moonraker:
+      host: moonraker.local
+      port: 7125
+      apikey: ""
+    bambu:
+      host: 192.168.1.50
+      serial: ""
+      access_code: ""
 ```
 
-**Note:** Unlike the original plugin, this fork **can work even if `Serial Connection > General > Port` is set to `AUTO`**, as long as `forced_port` is configured in the plugin settings.
-```
-serial:
-  port: /dev/ttyUSB0
-```
-When you change the port from `AUTO` to something else, you will need to connect to the printer manually first (or restart the server).
+For serial, AutoConnectPlus can work even if `Serial Connection > General > Port` is set
+to `AUTO`, as long as `forced_port` is configured.

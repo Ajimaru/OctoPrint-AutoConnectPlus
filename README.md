@@ -1,72 +1,82 @@
-# OctoPrint-PortRetryPlus
+# OctoPrint-AutoConnectPlus
 
-Automatically reconnects your printer when the serial connection is lost.
+Automatically (re)connect your printer in OctoPrint — not only over **serial**, but
+also through the new OctoPrint 2.0 **connector framework** for **Moonraker (Klipper)**
+and **Bambu** printers.
 
-This plugin periodically attempts to reconnect to the configured serial port, which is especially useful in environments where the device node remains present even when the printer is powered off.
+AutoConnectPlus is a fork of
+[OctoPrint-PortRetryPlus](https://github.com/hprombex/OctoPrint-PortRetryPlus) that
+keeps its proven retry/timer logic and extends it to the modern connector API.
 
-Typical use cases:
-Running OctoPrint inside LXC/Docker where /dev/ttyUSB* persists
-Printers (e.g. some Prusa models) that do not properly remove the serial device when powered down
+## Features
 
-## Setup
+- **Serial** — original PortRetryPlus behaviour: probes the serial port and reconnects
+  using the legacy connection API. Works on older serial-only OctoPrint too.
+- **Moonraker** — reconnects via `printer.connect(connector="moonraker", ...)` using
+  host / port / API key.
+- **Bambu** — reconnects via `printer.connect(connector="bambu", ...)` using
+  host / serial / access code.
+- Event-driven: the retry timer starts on `Disconnected` and stops on `Connected`.
+- Configurable retry interval.
+- Optional precondition check (e.g. host resolvable) before each connector attempt,
+  to avoid noisy repeated failures.
 
-Manually using this URL:
+## Requirements
 
-    https://github.com/hprombex/OctoPrint-PortRetryPlus/archive/master.zip
+- **Serial** mode works on any reasonably recent OctoPrint.
+- **Moonraker / Bambu** modes require **OctoPrint 2.0+** (the connector framework) and
+  the matching connector plugin installed:
+  - [OctoPrint-MoonrakerConnector](https://github.com/OctoPrint/OctoPrint-MoonrakerConnector)
+  - [OctoPrint-BambuConnector](https://github.com/OctoPrint/OctoPrint-BambuConnector)
+    (which provides the `bpm` / bambu-printer-manager dependency — AutoConnectPlus does
+    **not** install it itself).
+
+If you select a connector type on an OctoPrint without the connector framework,
+AutoConnectPlus logs a clear error and does nothing — serial mode still works.
+
+## Installation
+
+Install via the OctoPrint Plugin Manager using this URL:
+
+    https://github.com/ajimaru/OctoPrint-AutoConnectPlus/archive/main.zip
+
+or manually:
+
+    pip install "https://github.com/ajimaru/OctoPrint-AutoConnectPlus/archive/main.zip"
 
 ## Configuration
 
-In ~/.octoprint/config.yaml, the interval can be configured to something other than the default 5 seconds.
-There is also a settings page in the webui
-```yaml
-plugins:
-  portretryplus:
-    interval: 5
-    forced_port: /dev/ttyUSB0
-```
+Open **Settings → AutoConnectPlus**:
 
-**Note:** Unlike the original plugin, this fork **can work even if `Serial Connection > General > Port` is set to `AUTO`**, as long as `forced_port` is configured in the plugin settings.
+- **Connection type** — `Serial`, `Moonraker`, or `Bambu`.
+- **Retry interval (seconds)** — how often to attempt a reconnect while disconnected.
+- **Serial**: optional **Forced serial port** (used only when the global serial port is
+  unset or `AUTO`).
+- **Moonraker**: **Host**, **Port** (default `7125`), **API key** (optional).
+- **Bambu**: **Host**, **Serial**, **Access code**.
 
-Example in `~/.octoprint/config.yaml`:
+The printer profile used is OctoPrint's default profile.
 
-```yaml
-serial:
-  port: AUTO
+## How it works
 
-plugins:
-  portretryplus:
-    forced_port: /dev/ttyUSB0
-```
-When you change the port from `AUTO` to something else, you will need to connect to the printer manually first (or restart the server).
+A `RepeatedTimer` runs while the printer is disconnected and calls the auto-connect
+routine on each tick. The routine dispatches on the configured connection type:
 
-## Misc
+- *serial* → probes `serial.Serial(port, baudrate)` then `printer.connect(port=, profile=)`.
+- *moonraker / bambu* → no device-node probe; builds the parameter dict, optionally
+  checks `connection_preconditions_met`, then calls
+  `printer.connect(connector=..., parameters=..., profile=...)`.
 
-To keep your printer working without having to reboot the lxc every time you turn it on, I'm putting what I found here so that it may be of use for someone.
-
-I found the idea [here](https://monach.us/automation/connecting-zwave-stick-under-lxc/) (instructions will be for my setup with the lxc id 108 and the serial port /dev/ttyUSB0)
-
-* Check the info on the serial port
-  ```bash
-  $ ls -l /dev/ttyUSB0
-  crw-rw---- 1 root dialout 188, 0 Sep 13 20:32 /dev/ttyUSB0
-  ```
-* Create the folder `/var/lib/lxc/108/devices`
-* Run `cd /var/lib/lxc/108/devices && mknod -m 660 ttyUSB0 c 188 0` to create an always available device linking to the same device as `/dev/ttyUSB0`
-* In the lxc config, add the newly created device to the lxc instead of `/dev/ttyUSB0`
-  Also remember to map the dialout group (if your lxc is unprivileged), it has gid 20 for me
-  ```bash
-  lxc.cgroup.devices.allow: c 188:* rwm
-  lxc.mount.entry: /var/lib/lxc/108/devices/ttyUSB0 dev/ttyUSB0 none bind,optional,create=file
-  lxc.idmap: u 0 100000 20
-  lxc.idmap: g 0 100000 20
-  lxc.idmap: u 20 20 1
-  lxc.idmap: g 20 20 1
-  lxc.idmap: u 21 100021 65515
-  lxc.idmap: g 21 100021 65515
-  ```
+All attempts are wrapped in robust error handling, since connector connects are
+asynchronous and raise different exception types than serial.
 
 ## Credits
 
-This project is based on [OctoPrint-PortRetry](https://github.com/vehystrix/OctoPrint-PortRetry) by vehystrix.
+- Original [OctoPrint-PortRetryPlus](https://github.com/hprombex/OctoPrint-PortRetryPlus)
+  by **hprombex**.
+- Earlier work and inspiration credited to **vehystrix**.
 
-This fork introduces additional improvements, including smarter reconnect logic, forced serial port support, and more robust connection handling.
+## License
+
+Licensed under the **GNU Affero General Public License v3 (AGPLv3)**, matching the
+original project. See [LICENSE](LICENSE).

@@ -1,0 +1,88 @@
+<form class="form-horizontal">
+    <div class="control-group">
+        <label class="control-label">{{ _('Connection type') }}</label>
+        <div class="controls">
+            <select data-bind="value: settings.plugins.autoconnectplus.connection_type">
+                <option value="serial">{{ _('Serial (legacy / auto)') }}</option>
+                <option value="moonraker">{{ _('Moonraker (Klipper)') }}</option>
+                <option value="bambu">{{ _('Bambu (local)') }}</option>
+            </select>
+            <span class="help-block">
+                {{ _('Moonraker and Bambu require OctoPrint 2.0+ with the matching connector plugin installed.') }}
+            </span>
+        </div>
+    </div>
+
+    <div class="control-group">
+        <label class="control-label">{{ _('Retry interval (seconds)') }}</label>
+        <div class="controls">
+            <input type="number" min="0.1" step="0.1"
+                   data-bind="value: settings.plugins.autoconnectplus.interval">
+        </div>
+    </div>
+
+    <!-- Serial -->
+    <div data-bind="visible: settings.plugins.autoconnectplus.connection_type() == 'serial'">
+        <div class="control-group">
+            <label class="control-label">{{ _('Forced serial port') }}</label>
+            <div class="controls">
+                <input type="text" placeholder="/dev/ttyUSB0"
+                       data-bind="value: settings.plugins.autoconnectplus.forced_port">
+                <span class="help-block">
+                    {{ _('Optional. Used only when the global serial port is unset or AUTO.') }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Moonraker -->
+    <div data-bind="visible: settings.plugins.autoconnectplus.connection_type() == 'moonraker'">
+        <div class="control-group">
+            <label class="control-label">{{ _('Host') }}</label>
+            <div class="controls">
+                <input type="text" placeholder="moonraker.local"
+                       data-bind="value: settings.plugins.autoconnectplus.moonraker.host">
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label">{{ _('Port') }}</label>
+            <div class="controls">
+                <input type="number" min="1" step="1" placeholder="7125"
+                       data-bind="value: settings.plugins.autoconnectplus.moonraker.port">
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label">{{ _('API key') }}</label>
+            <div class="controls">
+                <input type="text"
+                       data-bind="value: settings.plugins.autoconnectplus.moonraker.apikey">
+                <span class="help-block">{{ _('Optional, depending on your Moonraker configuration.') }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bambu -->
+    <div data-bind="visible: settings.plugins.autoconnectplus.connection_type() == 'bambu'">
+        <div class="control-group">
+            <label class="control-label">{{ _('Host') }}</label>
+            <div class="controls">
+                <input type="text" placeholder="192.168.1.50"
+                       data-bind="value: settings.plugins.autoconnectplus.bambu.host">
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label">{{ _('Serial') }}</label>
+            <div class="controls">
+                <input type="text"
+                       data-bind="value: settings.plugins.autoconnectplus.bambu.serial">
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label">{{ _('Access code') }}</label>
+            <div class="controls">
+                <input type="text"
+                       data-bind="value: settings.plugins.autoconnectplus.bambu.access_code">
+            </div>
+        </div>
+    </div>
+</form>
