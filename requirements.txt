@@ -1,4 +1,0 @@
-# AutoConnectPlus has no extra runtime dependencies beyond OctoPrint.
-# Bambu support relies on `bpm` (bambu-printer-manager), which is provided by
-# the OctoPrint-BambuConnector plugin and is intentionally NOT declared here.
-OctoPrint

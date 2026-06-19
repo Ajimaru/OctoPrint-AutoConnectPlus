@@ -1,28 +1,29 @@
-Your plugin's translations will reside here. The provided setup.py supports a
-couple of additional commands to make managing your translations easier:
+Your plugin's translations reside here. This plugin uses pyproject.toml for
+packaging, so translations are managed with pybabel (Babel) directly rather than
+via setup.py commands. The most common workflow:
 
-babel_extract
-    Extracts any translateable messages (marked with Jinja's `_("...")` or
-    JavaScript's `gettext("...")`) and creates the initial `messages.pot` file.
-babel_refresh
-    Reruns extraction and updates the `messages.pot` file.
-babel_new --locale=<locale>
-    Creates a new translation folder for locale `<locale>`.
-babel_compile
-    Compiles the translations into `mo` files, ready to be used within
-    OctoPrint.
-babel_pack --locale=<locale> [ --author=<author> ]
-    Packs the translation for locale `<locale>` up as an installable
-    language pack that can be manually installed by your plugin's users. This is
-    interesting for languages you can not guarantee to keep up to date yourself
-    with each new release of your plugin and have to depend on contributors for.
+Extract translatable strings into the template (messages.pot):
+    pybabel extract -F babel.cfg -o translations/messages.pot octoprint_autoconnectplus
 
-If you want to bundle translations with your plugin, create a new folder
-`octoprint_autoconnectplus/translations`. When that folder exists,
-an additional command becomes available:
+Create a new locale catalog (e.g. de):
+    pybabel init -i translations/messages.pot -d translations -l de
 
-babel_bundle --locale=<locale>
-    Moves the translation for locale `<locale>` to octoprint_autoconnectplus/translations,
-    effectively bundling it with your plugin. This is interesting for languages
-    you can guarantee to keep up to date yourself with each new release of your
-    plugin.
+Update an existing catalog after the template changed:
+    pybabel update -i translations/messages.pot -d translations -l de
+
+Compile catalogs into the .mo files OctoPrint loads at runtime:
+    pybabel compile -d translations -l de
+
+To bundle a translation with the plugin (so it ships with it), the compiled
+catalog must live under octoprint_autoconnectplus/translations/<locale>/LC_MESSAGES/.
+Copy the compiled .po/.mo there, e.g.:
+    mkdir -p octoprint_autoconnectplus/translations/de/LC_MESSAGES
+    cp translations/de/LC_MESSAGES/messages.{po,mo} \
+       octoprint_autoconnectplus/translations/de/LC_MESSAGES/
+
+Note: the babel.cfg in this repo still lists the legacy Jinja2 extension names
+(jinja2.ext.autoescape / with_) for compatibility with OctoPrint's own Babel
+setup. With a newer standalone Jinja2 these are built-in; if extraction fails,
+extract with a minimal config containing only:
+    [python: */**.py]
+    [jinja2: */**.jinja2]

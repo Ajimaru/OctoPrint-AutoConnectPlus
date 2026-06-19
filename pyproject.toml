@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OctoPrint-AutoConnectPlus"
+version = "0.1.0rc1"
+description = "Automatically reconnects the printer over serial, Moonraker or Bambu connectors"
+authors = [
+    {name = "ajimaru", email = "ajimaru_gdr@pm.me"}
+]
+readme = {file = "README.md", content-type = "text/markdown"}
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+
+requires-python = ">=3.9, <4"
+
+# Any additional requirements (besides OctoPrint) should be listed here.
+# NOTE: Bambu support relies on `bpm` (bambu-printer-manager), which is provided
+# by the OctoPrint-BambuConnector plugin. It is intentionally NOT declared here.
+dependencies = []
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = [
+    "octoprint_autoconnectplus",
+    "octoprint_autoconnectplus.*"
+]
+
+[project.entry-points."octoprint.plugin"]
+autoconnectplus = "octoprint_autoconnectplus"
+
+[project.urls]
+Homepage = "https://github.com/ajimaru/OctoPrint-AutoConnectPlus"
+Source = "https://github.com/ajimaru/OctoPrint-AutoConnectPlus"

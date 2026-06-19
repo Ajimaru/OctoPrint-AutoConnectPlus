@@ -8,8 +8,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OctoPrint-AutoConnectPlus 1.0.0\n"
 "Report-Msgid-Bugs-To: ajimaru_gdr@pm.me\n"
-"POT-Creation-Date: 2026-06-17 20:34+0200\n"
-"PO-Revision-Date: 2026-06-17 20:34+0200\n"
+"POT-Creation-Date: 2026-06-18 18:30+0200\n"
+"PO-Revision-Date: 2026-06-18 18:30+0200\n"
 "Last-Translator: ajimaru <ajimaru_gdr@pm.me>\n"
 "Language: de\n"
 "Language-Team: German\n"
@@ -19,65 +19,58 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:3
-msgid "Connection type"
-msgstr "Verbindungstyp"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:6
-msgid "Serial (legacy / auto)"
-msgstr "Seriell (Legacy / Auto)"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:7
-msgid "Moonraker (Klipper)"
-msgstr "Moonraker (Klipper)"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:8
-msgid "Bambu (local)"
-msgstr "Bambu (lokal)"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:11
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:4
 msgid ""
-"Moonraker and Bambu require OctoPrint 2.0+ with the matching connector "
-"plugin installed."
+"AutoConnectPlus reconnects the printer using the connection you last "
+"configured in OctoPrint's connection dialog (serial, Moonraker, Bambu, "
+"...). The connection parameters are taken from OctoPrint directly, so "
+"there is nothing to duplicate here."
 msgstr ""
-"Moonraker und Bambu benötigen OctoPrint 2.0+ mit installiertem passendem "
-"Connector-Plugin."
+"AutoConnectPlus stellt die Verbindung mit der Verbindung wieder her, die "
+"du zuletzt im Verbindungsdialog von OctoPrint eingerichtet hast (Seriell,"
+" Moonraker, Bambu, ...). Die Verbindungsparameter werden direkt von "
+"OctoPrint übernommen, es muss hier also nichts doppelt eingetragen "
+"werden."
 
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:17
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:12
+msgid "Enable automatic (re)connect"
+msgstr "Automatisches (Wieder-)Verbinden aktivieren"
+
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:15
+msgid ""
+"When disabled, AutoConnectPlus stays idle and never reconnects the "
+"printer."
+msgstr ""
+"Wenn deaktiviert, bleibt AutoConnectPlus untätig und verbindet den Drucker "
+"nicht erneut."
+
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:21
+msgid "Detected connection"
+msgstr "Erkannte Verbindung"
+
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:32
+msgid "Read-only. Taken from OctoPrint's preferred connection."
+msgstr "Nur-Lesen. Wird aus der bevorzugten Verbindung von OctoPrint übernommen."
+
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:38
 msgid "Retry interval (seconds)"
 msgstr "Wiederholungsintervall (Sekunden)"
 
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:27
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:43
+msgid "How often to attempt a reconnect while the printer is disconnected."
+msgstr ""
+"Wie oft versucht wird, die Verbindung wiederherzustellen, während der "
+"Drucker getrennt ist."
+
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:49
 msgid "Forced serial port"
 msgstr "Erzwungener serieller Port"
 
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:32
-msgid "Optional. Used only when the global serial port is unset or AUTO."
+#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:54
+msgid ""
+"Serial connections only. Optional. Used only when OctoPrint's serial port"
+" is unset or AUTO."
 msgstr ""
-"Optional. Wird nur verwendet, wenn der globale serielle Port nicht gesetzt "
-"oder AUTO ist."
+"Nur für serielle Verbindungen. Optional. Wird nur verwendet, wenn der "
+"serielle Port von OctoPrint nicht gesetzt oder AUTO ist."
 
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:41
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:67
-msgid "Host"
-msgstr "Host"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:48
-msgid "Port"
-msgstr "Port"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:55
-msgid "API key"
-msgstr "API-Schlüssel"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:59
-msgid "Optional, depending on your Moonraker configuration."
-msgstr "Optional, abhängig von deiner Moonraker-Konfiguration."
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:74
-msgid "Serial"
-msgstr "Seriennummer"
-
-#: octoprint_autoconnectplus/templates/autoconnectplus_settings.jinja2:81
-msgid "Access code"
-msgstr "Zugangscode"
