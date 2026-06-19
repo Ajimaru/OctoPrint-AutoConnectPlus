@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # required to create a GitHub Release
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Resolve versions
+        id: ver
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          # Normalize PEP 440: a git tag like v0.1.0-rc1 maps to 0.1.0rc1.
+          norm_tag="$(echo "$tag" | sed -E 's/-(a|b|c|rc|alpha|beta|dev|post)/\1/I')"
+          pkg="$(python -c 'import tomllib,sys; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          echo "tag=$tag"            >> "$GITHUB_OUTPUT"
+          echo "norm_tag=$norm_tag"  >> "$GITHUB_OUTPUT"
+          echo "pkg=$pkg"            >> "$GITHUB_OUTPUT"
+          # Mark RC/alpha/beta/dev tags as prereleases.
+          if echo "$pkg" | grep -qiE '(a|b|c|rc|alpha|beta|dev)[0-9]*$'; then
+            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify tag matches pyproject version
+        run: |
+          if [ "${{ steps.ver.outputs.norm_tag }}" != "${{ steps.ver.outputs.pkg }}" ]; then
+            echo "::error::Tag ${{ steps.ver.outputs.tag }} (normalized ${{ steps.ver.outputs.norm_tag }}) does not match pyproject version ${{ steps.ver.outputs.pkg }}"
+            exit 1
+          fi
+          echo "OK: tag matches pyproject version ${{ steps.ver.outputs.pkg }}"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Smoke-test the built wheel
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --upgrade pip
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/python -c "import octoprint_autoconnectplus; print('import OK')"
+          /tmp/smoke/bin/python -c "from importlib.metadata import version; print('installed version', version('OctoPrint-AutoConnectPlus'))"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          prerelease: ${{ steps.ver.outputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
