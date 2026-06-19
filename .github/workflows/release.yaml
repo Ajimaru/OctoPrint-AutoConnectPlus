@@ -85,7 +85,14 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           # Normalize PEP 440: a git tag like v0.1.0-rc1 maps to 0.1.0rc1.
           norm_tag="$(echo "$tag" | sed -E 's/-(a|b|c|rc|alpha|beta|dev|post)/\1/I')"
-          pkg="$(python -c 'import tomllib,sys; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          # Read the version straight from pyproject.toml. Avoid tomllib (only
+          # in the stdlib on Python 3.11+; this job runs on 3.9). The version is
+          # a simple top-level `version = "..."` line, so grep it out.
+          pkg="$(grep -E '^version[[:space:]]*=' pyproject.toml | head -1 | sed -E 's/.*=[[:space:]]*["'"'"']([^"'"'"']+)["'"'"'].*/\1/')"
+          if [ -z "$pkg" ]; then
+            echo "::error::Could not parse version from pyproject.toml"
+            exit 1
+          fi
           echo "tag=$tag"            >> "$GITHUB_OUTPUT"
           echo "norm_tag=$norm_tag"  >> "$GITHUB_OUTPUT"
           echo "pkg=$pkg"            >> "$GITHUB_OUTPUT"
