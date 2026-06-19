@@ -1,74 +1,81 @@
 # OctoPrint-AutoConnectPlus
 
+[![GitHub release](https://img.shields.io/github/v/release/ajimaru/OctoPrint-AutoConnectPlus?include_prereleases&sort=semver)](https://github.com/ajimaru/OctoPrint-AutoConnectPlus/releases)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+
 Automatically (re)connect your printer in OctoPrint — not only over **serial**, but
-also through the new OctoPrint 2.0 **connector framework** for **Moonraker (Klipper)**
-and **Bambu** printers.
+also through the OctoPrint 2.0 **connector framework** for **Moonraker (Klipper)**,
+**Bambu** and any other registered connector.
 
 AutoConnectPlus is a fork of
 [OctoPrint-PortRetryPlus](https://github.com/hprombex/OctoPrint-PortRetryPlus) that
 keeps its proven retry/timer logic and extends it to the modern connector API.
 
-## Features
+## How it works
 
-- **Serial** — original PortRetryPlus behaviour: probes the serial port and reconnects
-  using the legacy connection API. Works on older serial-only OctoPrint too.
-- **Moonraker** — reconnects via `printer.connect(connector="moonraker", ...)` using
-  host / port / API key.
-- **Bambu** — reconnects via `printer.connect(connector="bambu", ...)` using
-  host / serial / access code.
+OctoPrint can auto-connect **once** on startup, but it does **not** retry if that
+attempt fails, and it does **not** reconnect after a disconnect. On **OctoPrint 2.0+**
+this applies to your *preferred* connection (the connector and its parameters); on
+**OctoPrint 1.x** it applies to the classic serial connection.
+
+AutoConnectPlus fills exactly that gap on both — keeping a printer connected by
+retrying until it succeeds, and reconnecting automatically after any disconnect:
+
+- A `RepeatedTimer` runs while the printer is disconnected and retries on a
+  configurable interval.
+- It reuses **OctoPrint's own preferred connection** — connector and parameters are
+  read from `printerConnection.preferred`, so whatever you set up in OctoPrint's
+  connection dialog (serial, Moonraker, Bambu, ...) is what gets reconnected. **There
+  is nothing to configure twice.**
+- For connector types it checks `connection_preconditions_met` and probes the host's
+  TCP port before each attempt, so an offline printer is skipped quietly (the timer
+  just keeps waiting) instead of flooding the log.
+- When a connect is actually attempted but keeps failing, the retry rate backs off
+  progressively, so a misconfigured connection doesn't hammer the log every interval.
+- For serial it keeps the original PortRetryPlus behaviour, including the optional
+  forced port when OctoPrint's serial port is unset or `AUTO`.
 - Event-driven: the retry timer starts on `Disconnected` and stops on `Connected`.
-- Configurable retry interval.
-- Optional precondition check (e.g. host resolvable) before each connector attempt,
-  to avoid noisy repeated failures.
+
+OctoPrint stores a single preferred connection, so there is never any ambiguity. If
+it is missing or incomplete (or the matching connector plugin is not installed), the
+plugin simply keeps waiting and logs the reason once instead of every interval.
 
 ## Requirements
 
-- **Serial** mode works on any reasonably recent OctoPrint.
-- **Moonraker / Bambu** modes require **OctoPrint 2.0+** (the connector framework) and
-  the matching connector plugin installed:
+- **Serial** mode works on any reasonably recent OctoPrint (1.x included), where it
+  behaves like classic PortRetryPlus.
+- **Moonraker / Bambu** (and other connectors) require **OctoPrint 2.0+** (the
+  connector framework) and the matching connector plugin installed:
   - [OctoPrint-MoonrakerConnector](https://github.com/OctoPrint/OctoPrint-MoonrakerConnector)
   - [OctoPrint-BambuConnector](https://github.com/OctoPrint/OctoPrint-BambuConnector)
     (which provides the `bpm` / bambu-printer-manager dependency — AutoConnectPlus does
     **not** install it itself).
 
-If you select a connector type on an OctoPrint without the connector framework,
-AutoConnectPlus logs a clear error and does nothing — serial mode still works.
-
 ## Installation
 
-Install via the OctoPrint Plugin Manager using this URL:
+Install via the OctoPrint Plugin Manager using a URL.
 
-    https://github.com/ajimaru/OctoPrint-AutoConnectPlus/archive/main.zip
+**Latest release** (recommended) — always points at the newest release, which may be a
+prerelease (e.g. an `-rc`) until the first stable version is out:
 
-or manually:
-
-    pip install "https://github.com/ajimaru/OctoPrint-AutoConnectPlus/archive/main.zip"
+    https://github.com/ajimaru/OctoPrint-AutoConnectPlus/releases/download/latest/OctoPrint-AutoConnectPlus-latest.zip
 
 ## Configuration
 
-Open **Settings → AutoConnectPlus**:
+First set up and connect your printer once via OctoPrint's normal **connection
+dialog** (serial / Moonraker / Bambu / ...). AutoConnectPlus will then reconnect using
+exactly that connection.
 
-- **Connection type** — `Serial`, `Moonraker`, or `Bambu`.
+Open **Settings → AutoConnectPlus**. It shows the **detected connection** (type and
+target, read-only) and these options:
+
+- **Enable automatic (re)connect** — master switch, on by default. When off, the plugin
+  stays idle and never reconnects.
 - **Retry interval (seconds)** — how often to attempt a reconnect while disconnected.
-- **Serial**: optional **Forced serial port** (used only when the global serial port is
-  unset or `AUTO`).
-- **Moonraker**: **Host**, **Port** (default `7125`), **API key** (optional).
-- **Bambu**: **Host**, **Serial**, **Access code**.
+- **Forced serial port** — *serial only, optional*. Used only when OctoPrint's serial
+  port is unset or `AUTO`.
 
 The printer profile used is OctoPrint's default profile.
-
-## How it works
-
-A `RepeatedTimer` runs while the printer is disconnected and calls the auto-connect
-routine on each tick. The routine dispatches on the configured connection type:
-
-- *serial* → probes `serial.Serial(port, baudrate)` then `printer.connect(port=, profile=)`.
-- *moonraker / bambu* → no device-node probe; builds the parameter dict, optionally
-  checks `connection_preconditions_met`, then calls
-  `printer.connect(connector=..., parameters=..., profile=...)`.
-
-All attempts are wrapped in robust error handling, since connector connects are
-asynchronous and raise different exception types than serial.
 
 ## Credits
 
@@ -78,5 +85,11 @@ asynchronous and raise different exception types than serial.
 
 ## License
 
-Licensed under the **GNU Affero General Public License v3 (AGPLv3)**, matching the
-original project. See [LICENSE](LICENSE).
+Licensed under the **GNU Affero General Public License v3 or later
+(AGPL-3.0-or-later)**, matching the original project. See [LICENSE](LICENSE).
+
+> [!NOTE]
+> **About this project.** I built this for my own printer setup with AI, and if
+> it helps others, even better. I have tested it to the best of my knowledge and
+> ability. Disclosed here per the OctoPrint plugin guidelines.
+> Issues and PRs are welcome.

@@ -1,6 +1,5 @@
 include README.md
 include LICENSE
-include requirements.txt
 recursive-include octoprint_autoconnectplus/templates *
 recursive-include octoprint_autoconnectplus/static *
 recursive-include octoprint_autoconnectplus/translations *

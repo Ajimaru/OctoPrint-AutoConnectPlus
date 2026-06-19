@@ -1,14 +1,35 @@
 <form class="form-horizontal">
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        {{ _('AutoConnectPlus reconnects the printer using the connection you last configured in OctoPrint\'s connection dialog (serial, Moonraker, Bambu, ...). The connection parameters are taken from OctoPrint directly, so there is nothing to duplicate here.') }}
+    </div>
+
     <div class="control-group">
-        <label class="control-label">{{ _('Connection type') }}</label>
         <div class="controls">
-            <select data-bind="value: settings.plugins.autoconnectplus.connection_type">
-                <option value="serial">{{ _('Serial (legacy / auto)') }}</option>
-                <option value="moonraker">{{ _('Moonraker (Klipper)') }}</option>
-                <option value="bambu">{{ _('Bambu (local)') }}</option>
-            </select>
+            <label class="checkbox">
+                <input type="checkbox"
+                       data-bind="checked: settings.plugins.autoconnectplus.enabled">
+                {{ _('Enable automatic (re)connect') }}
+            </label>
             <span class="help-block">
-                {{ _('Moonraker and Bambu require OctoPrint 2.0+ with the matching connector plugin installed.') }}
+                {{ _('When disabled, AutoConnectPlus stays idle and never reconnects the printer.') }}
+            </span>
+        </div>
+    </div>
+
+    <div class="control-group">
+        <label class="control-label">{{ _('Detected connection') }}</label>
+        <div class="controls">
+            <span class="help-block" style="margin-top: 5px;">
+                <strong>{{ plugin_autoconnectplus_detected_label }}</strong>{% if plugin_autoconnectplus_detected_target %} &mdash; {{ plugin_autoconnectplus_detected_target }}{% endif %}
+            </span>
+            {% if plugin_autoconnectplus_detected_warning %}
+            <span class="help-block text-warning">
+                {{ plugin_autoconnectplus_detected_warning }}
+            </span>
+            {% endif %}
+            <span class="help-block muted">
+                {{ _('Read-only. Taken from OctoPrint\'s preferred connection.') }}
             </span>
         </div>
     </div>
@@ -18,71 +39,20 @@
         <div class="controls">
             <input type="number" min="0.1" step="0.1"
                    data-bind="value: settings.plugins.autoconnectplus.interval">
+            <span class="help-block">
+                {{ _('How often to attempt a reconnect while the printer is disconnected.') }}
+            </span>
         </div>
     </div>
 
-    <!-- Serial -->
-    <div data-bind="visible: settings.plugins.autoconnectplus.connection_type() == 'serial'">
-        <div class="control-group">
-            <label class="control-label">{{ _('Forced serial port') }}</label>
-            <div class="controls">
-                <input type="text" placeholder="/dev/ttyUSB0"
-                       data-bind="value: settings.plugins.autoconnectplus.forced_port">
-                <span class="help-block">
-                    {{ _('Optional. Used only when the global serial port is unset or AUTO.') }}
-                </span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Moonraker -->
-    <div data-bind="visible: settings.plugins.autoconnectplus.connection_type() == 'moonraker'">
-        <div class="control-group">
-            <label class="control-label">{{ _('Host') }}</label>
-            <div class="controls">
-                <input type="text" placeholder="moonraker.local"
-                       data-bind="value: settings.plugins.autoconnectplus.moonraker.host">
-            </div>
-        </div>
-        <div class="control-group">
-            <label class="control-label">{{ _('Port') }}</label>
-            <div class="controls">
-                <input type="number" min="1" step="1" placeholder="7125"
-                       data-bind="value: settings.plugins.autoconnectplus.moonraker.port">
-            </div>
-        </div>
-        <div class="control-group">
-            <label class="control-label">{{ _('API key') }}</label>
-            <div class="controls">
-                <input type="text"
-                       data-bind="value: settings.plugins.autoconnectplus.moonraker.apikey">
-                <span class="help-block">{{ _('Optional, depending on your Moonraker configuration.') }}</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bambu -->
-    <div data-bind="visible: settings.plugins.autoconnectplus.connection_type() == 'bambu'">
-        <div class="control-group">
-            <label class="control-label">{{ _('Host') }}</label>
-            <div class="controls">
-                <input type="text" placeholder="192.168.1.50"
-                       data-bind="value: settings.plugins.autoconnectplus.bambu.host">
-            </div>
-        </div>
-        <div class="control-group">
-            <label class="control-label">{{ _('Serial') }}</label>
-            <div class="controls">
-                <input type="text"
-                       data-bind="value: settings.plugins.autoconnectplus.bambu.serial">
-            </div>
-        </div>
-        <div class="control-group">
-            <label class="control-label">{{ _('Access code') }}</label>
-            <div class="controls">
-                <input type="text"
-                       data-bind="value: settings.plugins.autoconnectplus.bambu.access_code">
-            </div>
+    <div class="control-group">
+        <label class="control-label">{{ _('Forced serial port') }}</label>
+        <div class="controls">
+            <input type="text" placeholder="/dev/ttyUSB0"
+                   data-bind="value: settings.plugins.autoconnectplus.forced_port">
+            <span class="help-block">
+                {{ _('Serial connections only. Optional. Used only when OctoPrint\'s serial port is unset or AUTO.') }}
+            </span>
         </div>
     </div>
 </form>
