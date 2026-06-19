@@ -53,10 +53,20 @@ jobs:
       - name: Build sdist and wheel
         run: python -m build
 
+      - name: Build versionless source archive
+        run: |
+          # Stable, version-independent filename so a single URL can always
+          # point at the newest release (see the rolling "latest" release below).
+          git archive --format=zip --prefix=OctoPrint-AutoConnectPlus/ \
+            -o dist/OctoPrint-AutoConnectPlus-latest.zip "$GITHUB_REF_NAME"
+
       - name: Smoke-test the built wheel
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
+          # OctoPrint provides the runtime deps (pyserial, octoprint.*) that the
+          # plugin imports; install it so the import check is meaningful.
+          /tmp/smoke/bin/pip install OctoPrint
           /tmp/smoke/bin/pip install dist/*.whl
           /tmp/smoke/bin/python -c "import octoprint_autoconnectplus; print('import OK')"
           /tmp/smoke/bin/python -c "from importlib.metadata import version; print('installed version', version('OctoPrint-AutoConnectPlus'))"
@@ -71,3 +81,24 @@ jobs:
           files: |
             dist/*.whl
             dist/*.tar.gz
+            dist/OctoPrint-AutoConnectPlus-latest.zip
+
+      # Maintain a rolling "latest" release whose source-zip URL never changes:
+      #   .../releases/download/latest/OctoPrint-AutoConnectPlus-latest.zip
+      # Unlike GitHub's /releases/latest, this is updated on EVERY tag push,
+      # so it tracks prereleases (rc/beta) too.
+      - name: Update rolling "latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Latest
+          tag_name: latest
+          prerelease: ${{ steps.ver.outputs.prerelease }}
+          body: |
+            Rolling pointer to the most recent release (**${{ github.ref_name }}**),
+            including prereleases. The asset URL below is stable across versions:
+
+            ```
+            https://github.com/${{ github.repository }}/releases/download/latest/OctoPrint-AutoConnectPlus-latest.zip
+            ```
+          files: |
+            dist/OctoPrint-AutoConnectPlus-latest.zip
