@@ -19,13 +19,21 @@ jobs:
       matrix:
         include:
           # PyPI "latest stable" is still the 1.x line; pin it explicitly.
+          # This is the gating leg: a failure here blocks the release.
           - label: "1.x"
             octoprint: "OctoPrint>=1.11,<2"
             pre: ""
+            blocking: true
           # 2.0 is only published as a prerelease for now, so allow --pre.
+          # Non-blocking: OctoPrint 2.0.0rc* still has a circular-import bug
+          # (octoprint.printer <-> octoprint.filemanager) that breaks a bare
+          # `import` outside a running server. Keep testing it for visibility,
+          # but don't let the unstable rc block releases. Flip to blocking once
+          # 2.0 stable is out.
           - label: "2.x"
             octoprint: "OctoPrint>=2.0.0rc1"
             pre: "--pre"
+            blocking: false
 
     steps:
       - name: Checkout
@@ -43,6 +51,9 @@ jobs:
         run: python -m build --wheel
 
       - name: Smoke-test the built wheel
+        # Non-blocking legs (matrix.blocking == false) report failures without
+        # failing the job, so the release's `needs: smoke` still succeeds.
+        continue-on-error: ${{ !matrix.blocking }}
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
