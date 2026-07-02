@@ -9,22 +9,32 @@ Auto-(re)connects the printer over serial, Moonraker or Bambu connectors,
 retrying on a configurable interval with exponential backoff.
 """
 
+from __future__ import annotations
+
 import logging
+import os
 import socket
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
-from typing import Any, Dict, List, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-import serial
-
+import flask
 import octoprint.plugin
-from octoprint.printer import PrinterInterface
-from octoprint.printer.profile import PrinterProfileManager
+from octoprint.events import Events
 from octoprint.util import RepeatedTimer, get_exception_string
+from serial.tools import list_ports
+
+if TYPE_CHECKING:
+    from octoprint.printer import PrinterInterface
+    from octoprint.printer.profile import PrinterProfileManager
 
 # Connector framework only exists on OctoPrint 2.0+; on older versions the
-# import fails and we fall back to serial-only behaviour.
+# import fails and we fall back to serial-only behaviour. The filemanager
+# import works around a circular import in OctoPrint 2.0.0rc* (importing
+# octoprint.printer.* before octoprint.filemanager trips the cycle); it is
+# harmless on versions where the cycle is fixed or OctoPrint already runs.
 try:
+    import octoprint.filemanager  # noqa: F401
     from octoprint.printer.connection import ConnectedPrinter
 except ImportError:
     ConnectedPrinter = None
@@ -37,11 +47,10 @@ class _PluginSettings(Protocol):
     signatures), so this Protocol gives the type checker a real contract.
     """
 
-    def get(self, path: List[str], **kwargs: Any) -> Any: ...
-    def get_float(self, path: List[str], **kwargs: Any) -> float: ...
-    def get_boolean(self, path: List[str], **kwargs: Any) -> bool: ...
-    def global_get(self, path: List[str], **kwargs: Any) -> Any: ...
-    def global_get_int(self, path: List[str], **kwargs: Any) -> int: ...
+    def get(self, path: list[str], **kwargs: Any) -> Any: ...
+    def get_float(self, path: list[str], **kwargs: Any) -> float: ...
+    def get_boolean(self, path: list[str], **kwargs: Any) -> bool: ...
+    def global_get(self, path: list[str], **kwargs: Any) -> Any: ...
 
 
 # Serial connector name (OctoPrint 2.0; implicit type on older versions).
@@ -78,9 +87,11 @@ CONNECTOR_LABELS = {
 
 class AutoConnectPlusPlugin(
     octoprint.plugin.StartupPlugin,
+    octoprint.plugin.ShutdownPlugin,
     octoprint.plugin.AssetPlugin,
     octoprint.plugin.TemplatePlugin,
     octoprint.plugin.SettingsPlugin,
+    octoprint.plugin.SimpleApiPlugin,
     octoprint.plugin.EventHandlerPlugin,
 ):
     """Auto-(re)connect the printer over serial or a 2.0 connector."""
@@ -96,8 +107,7 @@ class AutoConnectPlusPlugin(
 
     def __init__(self):
         super().__init__()
-        self._serial_port: Optional[str] = None
-        self._timer: Optional[RepeatedTimer] = None
+        self._timer: RepeatedTimer | None = None
         # keys already logged at error level, to avoid spamming on every retry
         self._warned_keys = set()
         # consecutive failed attempts since the last success; drives backoff
@@ -106,87 +116,55 @@ class AutoConnectPlusPlugin(
         self._skip_ticks = 0
 
     # ------------------------------------------------------------------ #
-    # Serial helpers (carried over from PortRetryPlus)
+    # Settings accessors
     # ------------------------------------------------------------------ #
 
-    @property
-    def serial_port(self) -> Optional[str]:
-        """Resolve the serial port to use.
-
-        Returns the current port if set and not "AUTO"; otherwise reads the
-        global serial.port, falling back to the configured forced port.
-        """
-        if self._serial_port not in [None, "AUTO"]:
-            return self._serial_port
-
-        self._serial_port = self._settings.global_get(["serial", "port"])
-
-        forced_port = self.__get_forced_port()
-        if self._serial_port in [None, "AUTO"] and forced_port:
-            self._serial_port = forced_port
-
-        return self._serial_port
-
-    def __is_enabled(self) -> bool:
+    def _is_enabled(self) -> bool:
         return self._settings.get_boolean(["enabled"])
 
-    def __get_interval(self) -> float:
+    def _get_interval(self) -> float:
         return self._settings.get_float(["interval"], min=0.1)
 
-    def __get_forced_port(self) -> str:
+    def _get_forced_port(self) -> str:
         return self._settings.get(["forced_port"])
 
-    def __get_preferred_connector(self) -> str:
+    def _get_preferred_connector(self) -> str:
         """Connector OctoPrint last used (2.0). Defaults to serial, also when
         the key is absent on serial-only versions."""
         connector = self._settings.global_get(PREFERRED_CONNECTOR_PATH)
         return connector if connector else CONNECTOR_SERIAL
 
-    def __get_preferred_parameters(self) -> dict:
+    def _get_preferred_parameters(self) -> dict:
         """Return the parameters OctoPrint stored for the preferred conn."""
         params = self._settings.global_get(PREFERRED_PARAMETERS_PATH)
         return params if isinstance(params, dict) else {}
 
-    def __is_serial_connector(self, connector: Optional[str]) -> bool:
+    def _is_serial_connector(self, connector: str | None) -> bool:
         return connector in (None, "", CONNECTOR_SERIAL)
 
-    def __detected_connection(self) -> Dict[str, str]:
-        """Describe the connection to reconnect, for the settings display:
-        label, target (serial port or host:port) and an optional warning."""
-        connector = self.__get_preferred_connector()
-        label = CONNECTOR_LABELS.get(connector, connector)
+    # ------------------------------------------------------------------ #
+    # Serial helpers (carried over from PortRetryPlus)
+    # ------------------------------------------------------------------ #
 
-        if self.__is_serial_connector(connector):
-            port = self.serial_port
-            target = "" if port in (None, "AUTO") else str(port)
-            warning = "" if target else (
-                "No serial port detected yet; set one in OctoPrint's "
-                "connection dialog or configure a forced port below."
-            )
-            return {"label": label, "target": target, "warning": warning}
+    @property
+    def serial_port(self) -> str | None:
+        """Resolve the serial port to use, re-read on every call so changes
+        in OctoPrint's connection settings are picked up immediately.
 
-        parameters = self.__get_preferred_parameters()
-        host = parameters.get("host", "")
-        port = parameters.get("port") or CONNECTOR_DEFAULT_PORTS.get(connector)
-        target = f"{host}:{port}" if host and port else host
+        Returns the global serial.port if set and not "AUTO", otherwise the
+        configured forced port, otherwise None (nothing to connect to yet).
+        """
+        port = self._settings.global_get(["serial", "port"])
+        if port not in (None, "AUTO"):
+            return port
 
-        warning = ""
-        if not host:
-            warning = (
-                "No preferred connection stored. Connect once via OctoPrint's "
-                "connection dialog so AutoConnectPlus knows what to reconnect."
-            )
-        elif ConnectedPrinter is not None and (
-            ConnectedPrinter.find(connector) is None
-        ):
-            warning = (
-                f"Connector '{connector}' is not installed. Install the "
-                "matching connector plugin."
-            )
+        return self._get_forced_port() or None
 
-        return {"label": label, "target": target, "warning": warning}
+    # ------------------------------------------------------------------ #
+    # Failure tracking / backoff
+    # ------------------------------------------------------------------ #
 
-    def __warn_once(self, key: str, msg: str):
+    def _warn_once(self, key: str, msg: str):
         """Log msg at error level the first time per key, debug thereafter, so
         a repeatedly failing connector doesn't flood the log. Reset on connect.
         """
@@ -196,19 +174,23 @@ class AutoConnectPlusPlugin(
             self._warned_keys.add(key)
             self._logger.error(msg)
 
-    def __reset_failures(self):
+    def _reset_failures(self):
         """Reset the warning/backoff state (called once the printer conn)."""
         self._warned_keys.clear()
         self._failures = 0
         self._skip_ticks = 0
 
-    def __register_failure(self):
+    def _register_failure(self):
         """Record a failed attempt and grow the backoff: each consecutive
         failure skips one more tick, capped at MAX_BACKOFF_TICKS."""
         self._failures += 1
         self._skip_ticks = min(self._failures, MAX_BACKOFF_TICKS)
 
-    def __timer_condition(self) -> bool:
+    # ------------------------------------------------------------------ #
+    # Retry timer
+    # ------------------------------------------------------------------ #
+
+    def _timer_condition(self) -> bool:
         if not self._printer.is_closed_or_error():
             return False
 
@@ -216,21 +198,21 @@ class AutoConnectPlusPlugin(
             self._skip_ticks -= 1
             return False
 
-        connector = self.__get_preferred_connector()
+        connector = self._get_preferred_connector()
 
-        if self.__is_serial_connector(connector):
+        if self._is_serial_connector(connector):
             # serial needs a resolvable port (global serial.port or forced)
-            return self.serial_port not in [None, "AUTO"]
+            return self.serial_port is not None
 
         # other connectors: keep retrying; precondition check happens in
         # do_auto_connect right before connecting
         return True
 
-    def __timer_cancelled(self):
+    def _on_timer_finished(self):
         self._timer = None
 
-    def __start_timer(self):
-        if not self.__is_enabled():
+    def _start_timer(self):
+        if not self._is_enabled():
             return
 
         # RepeatedTimer is a Thread and can start only once; never re-start a
@@ -239,42 +221,50 @@ class AutoConnectPlusPlugin(
         if self._timer is not None:
             return
         self._timer = RepeatedTimer(
-            self.__get_interval(),
+            self._get_interval(),
             self.do_auto_connect,
-            condition=self.__timer_condition,
-            on_finish=self.__timer_cancelled,
+            condition=self._timer_condition,
+            on_finish=self._on_timer_finished,
         )
         self._timer.start()
 
-    def __stop_timer(self):
+    def _stop_timer(self):
         if self._timer:
             self._timer.cancel()
             self._timer = None
 
+    # ------------------------------------------------------------------ #
+    # OctoPrint lifecycle hooks
+    # ------------------------------------------------------------------ #
+
     def on_event(self, event: str, payload: dict):
-        if "Connected" == event:
+        if event == Events.CONNECTED:
             self._logger.info("Printer connected, stopping timer")
-            self.__reset_failures()
-            self.__stop_timer()
-        elif "Disconnected" == event:
+            self._reset_failures()
+            self._stop_timer()
+        elif event == Events.DISCONNECTED:
             self._logger.info("Printer disconnected, starting timer")
-            self.__start_timer()
+            self._start_timer()
 
     def on_after_startup(self):
         """Log the active configuration and start the retry timer."""
-        connector = self.__get_preferred_connector()
+        connector = self._get_preferred_connector()
         msg = (
             f"AutoConnectPlus starting (preferred connector '{connector}', "
-            f"interval {self.__get_interval()})"
+            f"interval {self._get_interval()})"
         )
-        if self.__is_serial_connector(connector) and self.__get_forced_port():
-            msg += f" with forced serial port {self.__get_forced_port()}"
+        if self._is_serial_connector(connector) and self._get_forced_port():
+            msg += f" with forced serial port {self._get_forced_port()}"
         self._logger.info(msg)
-        self.__start_timer()
+        self._start_timer()
 
     def on_shutdown(self):
         """Stop the retry timer on server shutdown."""
-        self.__stop_timer()
+        self._stop_timer()
+
+    # ------------------------------------------------------------------ #
+    # Connecting
+    # ------------------------------------------------------------------ #
 
     def do_auto_connect(self):
         """Attempt a connection via the preferred connector, with backoff."""
@@ -282,61 +272,64 @@ class AutoConnectPlusPlugin(
             if not self._printer.is_closed_or_error():
                 return
 
-            connector = self.__get_preferred_connector()
+            connector = self._get_preferred_connector()
 
             printer_profile = self._printer_profile_manager.get_default()
-            profile = (
-                printer_profile["id"]
-                if "id" in printer_profile
-                else "_default"
-            )
+            profile = printer_profile.get("id", "_default")
 
-            if self.__is_serial_connector(connector):
-                attempted = self.__connect_serial(profile)
+            if self._is_serial_connector(connector):
+                attempted = self._connect_serial(profile)
             else:
-                attempted = self.__connect_connector(connector, profile)
+                attempted = self._connect_connector(connector, profile)
 
             # If a connect() fired, schedule a backoff; the "Connected" event
             # resets it on success, else attempts back off progressively.
             if attempted:
-                self.__register_failure()
+                self._register_failure()
         except Exception:  # pylint: disable=broad-exception-caught
             self._logger.error(
                 f"Exception in do_auto_connect {get_exception_string()}"
             )
-            self.__register_failure()
+            self._register_failure()
 
-    def __connect_serial(self, profile: str) -> bool:
+    def _connect_serial(self, profile: str) -> bool:
         """Legacy serial auto-connect (PortRetryPlus). Returns True if a
         connect() was attempted, False while merely waiting for the port."""
-        if self.serial_port in [None, "AUTO"]:
+        port = self.serial_port
+        if port is None:
             return False
 
-        baudrate = self._settings.global_get_int(["serial", "baudrate"])
-        portopen = False
+        if not self._serial_port_present(port):
+            self._logger.debug(f"Port {port} not present yet, waiting")
+            return False
 
+        self._logger.info(
+            f"Attempting to connect to {port} with profile {profile}"
+        )
+        self._printer.connect(port=port, profile=profile)
+        return True
+
+    def _serial_port_present(self, port: str) -> bool:
+        """Check that the port exists without opening it: opening a serial
+        port toggles DTR, which resets Arduino-style boards, so an open-probe
+        would reset the printer twice (probe + OctoPrint's own connect).
+
+        Stays optimistic when enumeration fails; a truly bad port then just
+        fails OctoPrint's connect() and the retry backs off.
+        """
         try:
-            if isinstance(baudrate, int):
-                self._logger.debug(f"using baudrate {baudrate}")
-                ser0 = serial.Serial(self.serial_port, baudrate)
-            else:
-                self._logger.debug("using default baudrate")
-                ser0 = serial.Serial(self.serial_port)
-            portopen = ser0.is_open
-        except serial.SerialException:
-            self._logger.debug(f"Failed to open port {self.serial_port}")
-
-        if portopen:
-            self._logger.info(
-                f"Attempting to connect to {self.serial_port} "
-                f"with profile {profile}"
-            )
-            self._printer.connect(port=self.serial_port, profile=profile)
+            available = {info.device for info in list_ports.comports()}
+        except Exception:  # pylint: disable=broad-exception-caught
             return True
 
-        return False
+        if port in available:
+            return True
 
-    def __connect_connector(self, connector: str, profile: str) -> bool:
+        # Forced ports are often stable symlinks (/dev/serial/by-id/..., udev
+        # aliases); match against the resolved device node too.
+        return os.path.realpath(port) in available
+
+    def _connect_connector(self, connector: str, profile: str) -> bool:
         """Auto-connect via the OctoPrint 2.0 connector framework (moonraker,
         bambu, ...). Parameters come from the stored preferred connection so
         they match what the user configured.
@@ -345,7 +338,7 @@ class AutoConnectPlusPlugin(
         warrants backoff), False if we are simply waiting.
         """
         if ConnectedPrinter is None:
-            self.__warn_once(
+            self._warn_once(
                 "no_framework",
                 f"Connector '{connector}' requires the OctoPrint 2.0 "
                 "connector framework, which is not available on this "
@@ -355,14 +348,14 @@ class AutoConnectPlusPlugin(
 
         connector_cls = ConnectedPrinter.find(connector)
         if connector_cls is None:
-            self.__warn_once(
+            self._warn_once(
                 f"no_connector:{connector}",
                 f"No connector registered for '{connector}'. Is the "
                 f"corresponding connector plugin installed?",
             )
             return True  # persistent: back off
 
-        parameters = self.__get_preferred_parameters()
+        parameters = self._get_preferred_parameters()
 
         # optional precondition check (best-effort; proceed if it errors out)
         try:
@@ -382,7 +375,7 @@ class AutoConnectPlusPlugin(
         # passes even when the printer is off and connect() then floods the log
         # with "No route to host". Probe the TCP port first and just wait if
         # unreachable, keeping the retry quiet.
-        if not self.__host_reachable(connector, parameters):
+        if not self._host_reachable(connector, parameters):
             self._logger.debug(
                 f"Host for '{connector}' not reachable yet, waiting"
             )
@@ -396,7 +389,7 @@ class AutoConnectPlusPlugin(
         )
         return True
 
-    def __host_reachable(self, connector: str, parameters: dict) -> bool:
+    def _host_reachable(self, connector: str, parameters: dict) -> bool:
         """TCP probe for the connector's host. Returns True ("go ahead") when
         reachable, or when no host/port is known (unknown connectors stay
         optimistic). Only a refused or timed-out host returns False.
@@ -422,6 +415,58 @@ class AutoConnectPlusPlugin(
         except OSError:
             return False
 
+    # ------------------------------------------------------------------ #
+    # Detected connection (settings display / simple API)
+    # ------------------------------------------------------------------ #
+
+    def _detected_connection(self) -> dict[str, str]:
+        """Describe the connection to reconnect, for the settings display:
+        label, target (serial port or host:port) and an optional warning."""
+        connector = self._get_preferred_connector()
+        label = CONNECTOR_LABELS.get(connector, connector)
+
+        if self._is_serial_connector(connector):
+            target = self.serial_port or ""
+            warning = "" if target else (
+                "No serial port detected yet; set one in OctoPrint's "
+                "connection dialog or configure a forced port below."
+            )
+            return {"label": label, "target": target, "warning": warning}
+
+        parameters = self._get_preferred_parameters()
+        host = parameters.get("host", "")
+        port = parameters.get("port") or CONNECTOR_DEFAULT_PORTS.get(connector)
+        target = f"{host}:{port}" if host and port else host
+
+        warning = ""
+        if not host:
+            warning = (
+                "No preferred connection stored. Connect once via OctoPrint's "
+                "connection dialog so AutoConnectPlus knows what to reconnect."
+            )
+        elif ConnectedPrinter is not None and (
+            ConnectedPrinter.find(connector) is None
+        ):
+            warning = (
+                f"Connector '{connector}' is not installed. Install the "
+                "matching connector plugin."
+            )
+
+        return {"label": label, "target": target, "warning": warning}
+
+    def on_api_get(self, request):
+        """Serve the detected connection to the settings dialog, which fetches
+        it every time it is shown so the display never goes stale."""
+        return flask.jsonify(self._detected_connection())
+
+    def is_api_protected(self):  # type: ignore[override]
+        # The response contains the printer's host/port; logged-in users only.
+        return True
+
+    # ------------------------------------------------------------------ #
+    # Settings / templates / assets
+    # ------------------------------------------------------------------ #
+
     def get_settings_defaults(self):
         return dict(
             enabled=True,
@@ -439,22 +484,15 @@ class AutoConnectPlusPlugin(
         pass
 
     def get_template_configs(self):
-        return [dict(type="settings", custom_bindings=False)]
+        # custom_bindings=True: the template is bound by this plugin's own
+        # view model (see autoconnectplus.js), which exposes the settings view
+        # model as `settings` plus the live detected-connection observables.
+        return [dict(type="settings", custom_bindings=True)]
 
     def is_template_autoescaped(self):  # type: ignore[override]
         # All expressions are plain text; nothing injects HTML, so autoescaping
         # is safe and silences OctoPrint's autoescape warning.
         return True
-
-    def get_template_vars(self):
-        # Exposed read-only as plugin_autoconnectplus_detected_*; evaluated
-        # when the settings dialog is rendered.
-        detected = self.__detected_connection()
-        return {
-            "detected_label": detected["label"],
-            "detected_target": detected["target"],
-            "detected_warning": detected["warning"],
-        }
 
     def get_assets(self):
         return dict(js=["js/autoconnectplus.js"])
@@ -477,27 +515,28 @@ class AutoConnectPlusPlugin(
             )
         )
 
-    def on_settings_save(self, data) -> Dict[Any, Any]:
-        enabled = self.__is_enabled()
-        interval = self.__get_interval()
+    def on_settings_save(self, data) -> dict[Any, Any]:
+        enabled = self._is_enabled()
+        interval = self._get_interval()
 
         result = octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
 
-        new_enabled = self.__is_enabled()
-        new_interval = self.__get_interval()
+        new_enabled = self._is_enabled()
+        new_interval = self._get_interval()
 
         if enabled != new_enabled:
             if new_enabled:
                 self._logger.info("AutoConnect enabled, starting timer")
                 if self._printer.is_closed_or_error():
-                    self.__start_timer()
+                    self._start_timer()
             else:
                 self._logger.info("AutoConnect disabled, stopping timer")
-                self.__stop_timer()
+                self._stop_timer()
         elif new_enabled and interval != new_interval:
             self._logger.info(f"Retry interval changed to {new_interval}")
-            self.__stop_timer()
-            self.__start_timer()
+            self._stop_timer()
+            if self._printer.is_closed_or_error():
+                self._start_timer()
 
         return result
 

@@ -1,5 +1,6 @@
 # OctoPrint-AutoConnectPlus
 
+[![CI](https://github.com/ajimaru/OctoPrint-AutoConnectPlus/actions/workflows/ci.yaml/badge.svg)](https://github.com/ajimaru/OctoPrint-AutoConnectPlus/actions/workflows/ci.yaml)
 [![GitHub release](https://img.shields.io/github/v/release/ajimaru/OctoPrint-AutoConnectPlus?include_prereleases&sort=semver)](https://github.com/ajimaru/OctoPrint-AutoConnectPlus/releases)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
@@ -33,7 +34,10 @@ retrying until it succeeds, and reconnecting automatically after any disconnect:
 - When a connect is actually attempted but keeps failing, the retry rate backs off
   progressively, so a misconfigured connection doesn't hammer the log every interval.
 - For serial it keeps the original PortRetryPlus behaviour, including the optional
-  forced port when OctoPrint's serial port is unset or `AUTO`.
+  forced port when OctoPrint's serial port is unset or `AUTO`. Whether the port is
+  present is checked **without opening it** — no DTR toggle, so boards that reset on
+  serial open (Arduino-style) are not reset twice per attempt. Symlinked ports
+  (`/dev/serial/by-id/...`, udev aliases) are resolved before matching.
 - Event-driven: the retry timer starts on `Disconnected` and stops on `Connected`.
 
 OctoPrint stores a single preferred connection, so there is never any ambiguity. If
@@ -58,7 +62,9 @@ Install via the OctoPrint Plugin Manager using a URL.
 **Latest release** (recommended) — always points at the newest release, which may be a
 prerelease (e.g. an `-rc`) until the first stable version is out:
 
-    https://github.com/ajimaru/OctoPrint-AutoConnectPlus/releases/download/latest/OctoPrint-AutoConnectPlus-latest.zip
+```text
+https://github.com/ajimaru/OctoPrint-AutoConnectPlus/releases/download/latest/OctoPrint-AutoConnectPlus-latest.zip
+```
 
 ## Configuration
 
@@ -67,7 +73,7 @@ dialog** (serial / Moonraker / Bambu / ...). AutoConnectPlus will then reconnect
 exactly that connection.
 
 Open **Settings → AutoConnectPlus**. It shows the **detected connection** (type and
-target, read-only) and these options:
+target, refreshed every time the dialog opens) and these options:
 
 - **Enable automatic (re)connect** — master switch, on by default. When off, the plugin
   stays idle and never reconnects.
@@ -76,6 +82,64 @@ target, read-only) and these options:
   port is unset or `AUTO`.
 
 The printer profile used is OctoPrint's default profile.
+
+The same options can be set in `~/.octoprint/config.yaml`:
+
+```yaml
+plugins:
+  autoconnectplus:
+    enabled: true          # master switch
+    interval: 5.0          # seconds between retries (minimum 0.1)
+    forced_port: ""        # serial only: used when OctoPrint's port is unset/AUTO
+```
+
+## Troubleshooting
+
+All plugin activity is logged to `octoprint.log`, prefixed with
+`octoprint.plugins.autoconnectplus`.
+
+- **Nothing reconnects at all** — check that the plugin is enabled in its settings
+  and that the *detected connection* shown there is the one you expect. If a warning
+  is shown instead (no port detected, no preferred connection stored, connector
+  plugin missing), fix that first: connect once via OctoPrint's connection dialog
+  and/or install the matching connector plugin.
+- **The printer is off and the log stays quiet** — that is intentional. While the
+  printer's host or serial port is unreachable, the plugin waits silently (details
+  only appear at `DEBUG` log level) and connects as soon as it comes back.
+- **Retries seem to slow down** — also intentional. Every *failed* connect attempt
+  backs the retry off by one more interval, capped at 15 intervals (~80 s with the
+  default 5 s interval). A successful connect resets the backoff. Persistent
+  problems (e.g. a missing connector plugin) are logged **once** at error level,
+  then silently retried.
+- **Serial port never resolves** — if OctoPrint's serial port is `AUTO` and the
+  port cannot be detected, set a **forced serial port** in the plugin settings or a
+  concrete port in OctoPrint's connection dialog.
+
+## Development
+
+```bash
+git clone https://github.com/ajimaru/OctoPrint-AutoConnectPlus.git
+cd OctoPrint-AutoConnectPlus
+python -m venv .venv && source .venv/bin/activate
+pip install "OctoPrint>=1.11" -e ".[dev]"
+
+pytest             # run the unit tests
+ruff check .       # lint
+```
+
+The tests mock OctoPrint's printer and the connector framework, so they run against
+both OctoPrint 1.x and 2.x installs; CI covers both generations.
+
+Translations use the standard OctoPrint babel workflow (see
+[`translations/README.txt`](translations/README.txt)). UI strings live in the
+settings template; if you change them, update `translations/messages.pot` and the
+existing languages.
+
+**Releases:** bump `version` in [`pyproject.toml`](pyproject.toml) (single source of
+truth — the plugin reads it from package metadata at runtime), then push a matching
+tag such as `v0.2.0`. The release workflow verifies tag and version match, smoke-tests
+the wheel against OctoPrint 1.x and 2.x, publishes the GitHub release and updates the
+rolling `latest` release behind the stable install URL above.
 
 ## Credits
 
