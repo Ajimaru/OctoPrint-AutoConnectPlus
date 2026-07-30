@@ -8,7 +8,7 @@
         <div class="controls">
             <label class="checkbox">
                 <input type="checkbox"
-                       data-bind="checked: settings.plugins.autoconnectplus.enabled">
+                       data-bind="checked: settings.settings.plugins.autoconnectplus.enabled">
                 {{ _('Enable automatic (re)connect') }}
             </label>
             <span class="help-block">
@@ -21,13 +21,10 @@
         <label class="control-label">{{ _('Detected connection') }}</label>
         <div class="controls">
             <span class="help-block" style="margin-top: 5px;">
-                <strong>{{ plugin_autoconnectplus_detected_label }}</strong>{% if plugin_autoconnectplus_detected_target %} &mdash; {{ plugin_autoconnectplus_detected_target }}{% endif %}
+                <strong data-bind="text: detectedLabel"></strong><span data-bind="visible: detectedTarget"> &mdash; <span data-bind="text: detectedTarget"></span></span>
             </span>
-            {% if plugin_autoconnectplus_detected_warning %}
-            <span class="help-block text-warning">
-                {{ plugin_autoconnectplus_detected_warning }}
-            </span>
-            {% endif %}
+            <span class="help-block text-warning"
+                  data-bind="text: detectedWarning, visible: detectedWarning"></span>
             <span class="help-block muted">
                 {{ _('Read-only. Taken from OctoPrint\'s preferred connection.') }}
             </span>
@@ -38,7 +35,7 @@
         <label class="control-label">{{ _('Retry interval (seconds)') }}</label>
         <div class="controls">
             <input type="number" min="0.1" step="0.1"
-                   data-bind="value: settings.plugins.autoconnectplus.interval">
+                   data-bind="value: settings.settings.plugins.autoconnectplus.interval">
             <span class="help-block">
                 {{ _('How often to attempt a reconnect while the printer is disconnected.') }}
             </span>
@@ -49,7 +46,7 @@
         <label class="control-label">{{ _('Forced serial port') }}</label>
         <div class="controls">
             <input type="text" placeholder="/dev/ttyUSB0"
-                   data-bind="value: settings.plugins.autoconnectplus.forced_port">
+                   data-bind="value: settings.settings.plugins.autoconnectplus.forced_port">
             <span class="help-block">
                 {{ _('Serial connections only. Optional. Used only when OctoPrint\'s serial port is unset or AUTO.') }}
             </span>

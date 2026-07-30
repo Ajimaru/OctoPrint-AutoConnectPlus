@@ -12,3 +12,4 @@ octoprint/*
 .vscode/
 .github/instructions/codacy.instructions.md
 .claude/
+CLAUDE.md

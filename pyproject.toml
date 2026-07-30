@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OctoPrint-AutoConnectPlus"
-version = "0.1.0rc1"
+version = "0.1.0rc2"
 description = "Automatically reconnects the printer over serial, Moonraker or Bambu connectors"
 authors = [
     {name = "ajimaru", email = "ajimaru_gdr@pm.me"}
@@ -19,6 +19,12 @@ requires-python = ">=3.9, <4"
 # NOTE: Bambu support relies on `bpm` (bambu-printer-manager), which is provided
 # by the OctoPrint-BambuConnector plugin. It is intentionally NOT declared here.
 dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
 
 [tool.setuptools]
 include-package-data = true
@@ -35,3 +41,29 @@ autoconnectplus = "octoprint_autoconnectplus"
 [project.urls]
 Homepage = "https://github.com/ajimaru/OctoPrint-AutoConnectPlus"
 Source = "https://github.com/ajimaru/OctoPrint-AutoConnectPlus"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Import the plugin from the repository, not from an installed copy.
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py39"
+# Match the IDE linters' (flake8/pycodestyle) default so all tools agree.
+line-length = 79
+extend-exclude = ["dist", "extras"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "SIM", # simplifications
+]
+
+[tool.ruff.lint.isort]
+# Match the existing import grouping: OctoPrint after third-party.
+known-first-party = ["octoprint_autoconnectplus"]

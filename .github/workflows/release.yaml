@@ -25,11 +25,10 @@ jobs:
             pre: ""
             blocking: true
           # 2.0 is only published as a prerelease for now, so allow --pre.
-          # Non-blocking: OctoPrint 2.0.0rc* still has a circular-import bug
-          # (octoprint.printer <-> octoprint.filemanager) that breaks a bare
-          # `import` outside a running server. Keep testing it for visibility,
-          # but don't let the unstable rc block releases. Flip to blocking once
-          # 2.0 stable is out.
+          # The plugin sidesteps the rc* circular-import bug (octoprint.printer
+          # <-> octoprint.filemanager) itself, so this leg should pass; still
+          # non-blocking so a new, unstable rc can never block a release. Flip
+          # to blocking once 2.0 stable is out.
           - label: "2.x"
             octoprint: "OctoPrint>=2.0.0rc1"
             pre: "--pre"
@@ -145,7 +144,11 @@ jobs:
         with:
           name: Latest
           tag_name: latest
-          prerelease: ${{ steps.ver.outputs.prerelease }}
+          # Always a prerelease: GitHub's /releases/latest API (which the
+          # Software Update plugin's github_release check relies on) skips
+          # prereleases, so the rolling pointer with its non-PEP440 tag
+          # "latest" never shadows the real newest version there.
+          prerelease: true
           body: |
             Rolling pointer to the most recent release (**${{ github.ref_name }}**),
             including prereleases. The asset URL below is stable across versions:

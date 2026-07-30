@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install ruff
+        run: python -m pip install ruff
+
+      - name: Run ruff
+        run: ruff check .
+
+  # Run the unit tests against both OctoPrint generations: the tests mock the
+  # connector framework themselves, so they pass on 1.x (serial-only) too.
+  test:
+    name: Tests (OctoPrint ${{ matrix.label }}, Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Oldest and newest supported Python against the stable 1.x line.
+          - label: "1.x"
+            python: "3.9"
+            octoprint: "OctoPrint>=1.11,<2"
+            pre: ""
+            blocking: true
+          - label: "1.x"
+            python: "3.12"
+            octoprint: "OctoPrint>=1.11,<2"
+            pre: ""
+            blocking: true
+          # 2.0 is only published as a prerelease for now; non-blocking until
+          # a stable 2.0 is out (mirrors the release workflow's smoke test).
+          - label: "2.x"
+            python: "3.12"
+            octoprint: "OctoPrint>=2.0.0rc1"
+            pre: "--pre"
+            blocking: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install OctoPrint and pytest
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ${{ matrix.pre }} "${{ matrix.octoprint }}" pytest
+
+      - name: Run tests
+        # Non-blocking legs report failures without failing the job.
+        continue-on-error: ${{ !matrix.blocking }}
+        run: python -m pytest -q
