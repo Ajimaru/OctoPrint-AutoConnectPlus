@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OctoPrint-AutoConnectPlus"
-version = "0.1.0rc1"
+version = "0.1.0rc2"
 description = "Automatically reconnects the printer over serial, Moonraker or Bambu connectors"
 authors = [
     {name = "ajimaru", email = "ajimaru_gdr@pm.me"}
