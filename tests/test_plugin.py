@@ -101,9 +101,19 @@ def connector_framework(monkeypatch):
 
 
 def set_preferred(plugin, connector, parameters=None):
+    """Set the OctoPrint 2.0 preferred connection.
+
+    Also mirrors a serial port into the legacy global.serial.port path, so
+    these tests pass under both real OctoPrint 1.x (which only has the
+    legacy path) and 2.x (which reads printerConnection.preferred) without
+    needing to know which one is actually installed.
+    """
+    parameters = parameters or {}
     plugin._settings.globals["printerConnection"] = {
-        "preferred": {"connector": connector, "parameters": parameters or {}}
+        "preferred": {"connector": connector, "parameters": parameters}
     }
+    if connector == "serial" and "port" in parameters:
+        plugin._settings.globals["serial"] = {"port": parameters["port"]}
 
 
 # --------------------------------------------------------------------- #
@@ -112,12 +122,12 @@ def set_preferred(plugin, connector, parameters=None):
 
 
 def test_serial_port_prefers_global_setting(plugin):
-    plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB0"}
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB0"})
     assert plugin.serial_port == "/dev/ttyUSB0"
 
 
 def test_serial_port_falls_back_to_forced_port(plugin):
-    plugin._settings.globals["serial"] = {"port": "AUTO"}
+    set_preferred(plugin, "serial", {"port": "AUTO"})
     plugin._settings.plugin["forced_port"] = "/dev/ttyACM1"
     assert plugin.serial_port == "/dev/ttyACM1"
 
@@ -127,10 +137,19 @@ def test_serial_port_unresolved_is_none(plugin):
 
 
 def test_serial_port_not_cached(plugin):
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB0"})
+    assert plugin.serial_port == "/dev/ttyUSB0"
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB1"})
+    assert plugin.serial_port == "/dev/ttyUSB1"
+
+
+def test_serial_port_reads_legacy_path_without_connector_framework(
+    plugin, monkeypatch
+):
+    # OctoPrint 1.x: no printerConnection.preferred, serial.port is native.
+    monkeypatch.setattr(octoprint_autoconnectplus, "ConnectedPrinter", None)
     plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB0"}
     assert plugin.serial_port == "/dev/ttyUSB0"
-    plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB1"}
-    assert plugin.serial_port == "/dev/ttyUSB1"
 
 
 # --------------------------------------------------------------------- #
@@ -171,7 +190,7 @@ def test_timer_condition_false_while_printer_active(plugin):
 
 
 def test_timer_condition_counts_down_backoff(plugin):
-    plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB0"}
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB0"})
     plugin._skip_ticks = 2
     assert plugin._timer_condition() is False
     assert plugin._timer_condition() is False
@@ -180,7 +199,7 @@ def test_timer_condition_counts_down_backoff(plugin):
 
 def test_timer_condition_serial_requires_port(plugin):
     assert plugin._timer_condition() is False
-    plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB0"}
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB0"})
     assert plugin._timer_condition() is True
 
 
@@ -205,7 +224,7 @@ def test_connect_serial_waits_without_port(plugin):
 
 
 def test_connect_serial_connects_when_port_present(plugin):
-    plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB0"}
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB0"})
     with mock.patch(
         "serial.tools.list_ports.comports",
         new=comports_returning("/dev/ttyACM0", "/dev/ttyUSB0"),
@@ -217,7 +236,7 @@ def test_connect_serial_connects_when_port_present(plugin):
 
 
 def test_connect_serial_waits_while_port_absent(plugin):
-    plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB0"}
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB0"})
     with mock.patch(
         "serial.tools.list_ports.comports", new=comports_returning()
     ):
@@ -363,7 +382,7 @@ def test_do_auto_connect_backs_off_on_exception(plugin):
 
 
 def test_detected_connection_serial_with_port(plugin):
-    plugin._settings.globals["serial"] = {"port": "/dev/ttyUSB0"}
+    set_preferred(plugin, "serial", {"port": "/dev/ttyUSB0"})
     detected = plugin._detected_connection()
     assert detected == {
         "label": "Serial",

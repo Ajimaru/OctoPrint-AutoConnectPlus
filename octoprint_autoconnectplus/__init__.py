@@ -151,10 +151,17 @@ class AutoConnectPlusPlugin(
         """Resolve the serial port to use, re-read on every call so changes
         in OctoPrint's connection settings are picked up immediately.
 
-        Returns the global serial.port if set and not "AUTO", otherwise the
-        configured forced port, otherwise None (nothing to connect to yet).
+        Returns the configured serial port if set and not "AUTO", otherwise
+        the configured forced port, otherwise None (nothing to connect to
+        yet).
         """
-        port = self._settings.global_get(["serial", "port"])
+        if ConnectedPrinter is not None:
+            # 2.0: the old serial.port path is a deprecated compat overlay
+            # over this; read it directly to avoid the deprecation warning.
+            port = self._get_preferred_parameters().get("port")
+        else:
+            port = self._settings.global_get(["serial", "port"])
+
         if port not in (None, "AUTO"):
             return port
 
