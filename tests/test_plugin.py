@@ -101,9 +101,19 @@ def connector_framework(monkeypatch):
 
 
 def set_preferred(plugin, connector, parameters=None):
+    """Set the OctoPrint 2.0 preferred connection.
+
+    Also mirrors a serial port into the legacy global.serial.port path, so
+    these tests pass under both real OctoPrint 1.x (which only has the
+    legacy path) and 2.x (which reads printerConnection.preferred) without
+    needing to know which one is actually installed.
+    """
+    parameters = parameters or {}
     plugin._settings.globals["printerConnection"] = {
-        "preferred": {"connector": connector, "parameters": parameters or {}}
+        "preferred": {"connector": connector, "parameters": parameters}
     }
+    if connector == "serial" and "port" in parameters:
+        plugin._settings.globals["serial"] = {"port": parameters["port"]}
 
 
 # --------------------------------------------------------------------- #
