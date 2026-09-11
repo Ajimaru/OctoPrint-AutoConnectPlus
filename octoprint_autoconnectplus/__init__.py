@@ -426,10 +426,32 @@ class AutoConnectPlusPlugin(
     # Detected connection (settings display / simple API)
     # ------------------------------------------------------------------ #
 
-    def _detected_connection(self) -> dict[str, str]:
+    def _portretry_plugins_enabled(self) -> list[str]:
+        """Return the enabled PortRetry plugins that can conflict."""
+        plugin_names = {
+            "portretry": "PortRetry",
+            "portretryplus": "PortRetryPlus",
+        }
+        try:
+            plugin_manager = octoprint.plugin.plugin_manager()
+            return [
+                name
+                for identifier, name in plugin_names.items()
+                if plugin_manager.get_plugin_info(
+                    identifier, require_enabled=True
+                )
+                is not None
+            ]
+        except Exception:  # pylint: disable=broad-exception-caught
+            # Plugin discovery must never prevent the settings API from
+            # returning the detected connection.
+            return []
+
+    def _detected_connection(self) -> dict[str, Any]:
         """Describe the connection to reconnect, for the settings display:
         label, target (serial port or host:port) and an optional warning."""
         connector = self._get_preferred_connector()
+        portretry_plugins = self._portretry_plugins_enabled()
         label = CONNECTOR_LABELS.get(connector, connector)
 
         if self._is_serial_connector(connector):
@@ -438,7 +460,12 @@ class AutoConnectPlusPlugin(
                 "No serial port detected yet; set one in OctoPrint's "
                 "connection dialog or configure a forced port below."
             )
-            return {"label": label, "target": target, "warning": warning}
+            return {
+                "label": label,
+                "target": target,
+                "warning": warning,
+                "portretry_plugins": portretry_plugins,
+            }
 
         parameters = self._get_preferred_parameters()
         host = parameters.get("host", "")
@@ -459,9 +486,14 @@ class AutoConnectPlusPlugin(
                 "matching connector plugin."
             )
 
-        return {"label": label, "target": target, "warning": warning}
+        return {
+            "label": label,
+            "target": target,
+            "warning": warning,
+            "portretry_plugins": portretry_plugins,
+        }
 
-    def on_api_get(self, request):
+    def on_api_get(self, request):  # type: ignore[override]
         """Serve the detected connection to the settings dialog, which fetches
         it every time it is shown so the display never goes stale."""
         return flask.jsonify(self._detected_connection())
@@ -552,7 +584,9 @@ __plugin_name__ = "AutoConnectPlus"
 # Match the entry-point key so the runtime identifier is explicit (otherwise
 # defaults to the package name).
 __plugin_identifier__ = "autoconnectplus"
-__plugin_author__ = "ajimaru"
+__plugin_author__ = (
+    "ajimaru, based on work from vehystrix and hprombex"
+)
 __plugin_description__ = (
     "Automatically reconnects the printer over serial, Moonraker or Bambu "
     "connectors"

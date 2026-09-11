@@ -9,6 +9,36 @@
  * stale after the preferred connection changes.
  */
 $(function () {
+    var portRetryWarningShown = false;
+
+    function showPortRetryWarning(plugins) {
+        if (portRetryWarningShown || typeof PNotify === "undefined") {
+            return;
+        }
+
+        new PNotify({
+            title: "AutoConnectPlus error",
+            text: plugins.join(" and ") + " is also enabled. Disable " +
+                "one of the reconnect plugins to prevent competing " +
+                "reconnect attempts.",
+            type: "error",
+            hide: false,
+        });
+        portRetryWarningShown = true;
+    }
+
+    function checkPortRetryConflict() {
+        OctoPrint.simpleApiGet("autoconnectplus").done(function (data) {
+            if (data.portretry_plugins && data.portretry_plugins.length) {
+                showPortRetryWarning(data.portretry_plugins);
+            }
+        });
+    }
+
+    // Check immediately after the global plugin assets are ready, not only
+    // when the user opens the settings dialog.
+    checkPortRetryConflict();
+
     function AutoConnectPlusViewModel(parameters) {
         var self = this;
 
@@ -17,12 +47,14 @@ $(function () {
         self.detectedLabel = ko.observable("");
         self.detectedTarget = ko.observable("");
         self.detectedWarning = ko.observable("");
-
         self.refreshDetected = function () {
             OctoPrint.simpleApiGet("autoconnectplus").done(function (data) {
                 self.detectedLabel(data.label || "");
                 self.detectedTarget(data.target || "");
                 self.detectedWarning(data.warning || "");
+                if (data.portretry_plugins && data.portretry_plugins.length) {
+                    showPortRetryWarning(data.portretry_plugins);
+                }
             });
         };
 

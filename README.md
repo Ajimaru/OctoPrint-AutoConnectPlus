@@ -8,6 +8,13 @@ Automatically (re)connect your printer in OctoPrint — not only over **serial**
 also through the OctoPrint 2.0 **connector framework** for **Moonraker (Klipper)**,
 **Bambu** and any other registered connector.
 
+> [!NOTE]
+> **About this project.** I built this for my own printer setup with AI, and if
+> it helps others, even better. I have tested it to the best of my knowledge and
+> ability, and every change is backed by an automated test suite, CI, and
+> security scans (Bandit, CodeQL). Disclosed here per the OctoPrint plugin guidelines.
+> Issues and PRs are welcome.
+
 AutoConnectPlus is a fork of
 [OctoPrint-PortRetryPlus](https://github.com/hprombex/OctoPrint-PortRetryPlus) that
 keeps its proven retry/timer logic and extends it to the modern connector API.
@@ -43,6 +50,12 @@ retrying until it succeeds, and reconnecting automatically after any disconnect:
 OctoPrint stores a single preferred connection, so there is never any ambiguity. If
 it is missing or incomplete (or the matching connector plugin is not installed), the
 plugin simply keeps waiting and logs the reason once instead of every interval.
+
+**Only one reconnect plugin should be active.** AutoConnectPlus detects the original
+`PortRetry` plugin (`portretry`, by vehystrix) and the `PortRetryPlus` fork
+(`portretryplus`, by hprombex). If either one is enabled at the same time, AutoConnectPlus
+shows a permanent error toast as soon as the OctoPrint interface loads, because both
+plugins can compete to reconnect the same printer.
 
 ## Requirements
 
@@ -83,21 +96,14 @@ target, refreshed every time the dialog opens) and these options:
 
 The printer profile used is OctoPrint's default profile.
 
-The same options can be set in `~/.octoprint/config.yaml`:
-
-```yaml
-plugins:
-  autoconnectplus:
-    enabled: true          # master switch
-    interval: 5.0          # seconds between retries (minimum 0.1)
-    forced_port: ""        # serial only: used when OctoPrint's port is unset/AUTO
-```
-
 ## Troubleshooting
 
 All plugin activity is logged to `octoprint.log`, prefixed with
 `octoprint.plugins.autoconnectplus`.
 
+- **A permanent error toast mentions PortRetry** — disable either AutoConnectPlus,
+  PortRetry, or PortRetryPlus. Only one automatic reconnect plugin should be active;
+  installing both is supported, running both is not.
 - **Nothing reconnects at all** — check that the plugin is enabled in its settings
   and that the *detected connection* shown there is the one you expect. If a warning
   is shown instead (no port detected, no preferred connection stored, connector
@@ -145,15 +151,9 @@ rolling `latest` release behind the stable install URL above.
 
 - Original [OctoPrint-PortRetryPlus](https://github.com/hprombex/OctoPrint-PortRetryPlus)
   by **hprombex**.
-- Earlier work and inspiration credited to **vehystrix**.
+- Earlier work and inspiration from [OctoPrint-PortRetry](https://github.com/vehystrix/OctoPrint-PortRetry) credited to **vehystrix**.
 
 ## License
 
 Licensed under the **GNU Affero General Public License v3 or later
 (AGPL-3.0-or-later)**, matching the original project. See [LICENSE](LICENSE).
-
-> [!NOTE]
-> **About this project.** I built this for my own printer setup with AI, and if
-> it helps others, even better. I have tested it to the best of my knowledge and
-> ability. Disclosed here per the OctoPrint plugin guidelines.
-> Issues and PRs are welcome.
