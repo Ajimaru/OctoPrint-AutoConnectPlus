@@ -1,8 +1,12 @@
 # OctoPrint-AutoConnectPlus
 
-[![CI](https://github.com/ajimaru/OctoPrint-AutoConnectPlus/actions/workflows/ci.yaml/badge.svg)](https://github.com/ajimaru/OctoPrint-AutoConnectPlus/actions/workflows/ci.yaml)
-[![GitHub release](https://img.shields.io/github/v/release/ajimaru/OctoPrint-AutoConnectPlus?include_prereleases&sort=semver)](https://github.com/ajimaru/OctoPrint-AutoConnectPlus/releases)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square)](https://python.org)
+[![OctoPrint](https://img.shields.io/badge/OctoPrint-1.10.0%2B-blue?style=flat-square)](https://octoprint.org)
+[![Latest Release](https://img.shields.io/github/v/release/Ajimaru/OctoPrint-AutoConnectPlus?sort=semver&style=flat-square)](https://github.com/Ajimaru/OctoPrint-AutoConnectPlus/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Ajimaru/OctoPrint-AutoConnectPlus/total?style=flat-square)](https://github.com/Ajimaru/OctoPrint-AutoConnectPlus/releases)
+[![Made with Love](https://img.shields.io/badge/made_with-%E2%9D%A4%EF%B8%8F-ff69b4?style=flat-square)](https://github.com/Ajimaru/OctoPrint-AutoConnectPlus)
+[![CI](https://img.shields.io/github/actions/workflow/status/Ajimaru/OctoPrint-AutoConnectPlus/ci.yaml?branch=main&label=CI&style=flat-square)](https://github.com/Ajimaru/OctoPrint-AutoConnectPlus/actions/workflows/ci.yaml)
 
 Automatically (re)connect your printer in OctoPrint — not only over **serial**, but
 also through the OctoPrint 2.0 **connector framework** for **Moonraker (Klipper)**,
