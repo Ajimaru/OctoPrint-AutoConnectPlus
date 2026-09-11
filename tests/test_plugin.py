@@ -388,6 +388,7 @@ def test_detected_connection_serial_with_port(plugin):
         "label": "Serial",
         "target": "/dev/ttyUSB0",
         "warning": "",
+        "portretry_plugins": [],
     }
 
 
@@ -396,6 +397,45 @@ def test_detected_connection_serial_without_port_warns(plugin):
     assert detected["label"] == "Serial"
     assert detected["target"] == ""
     assert "No serial port" in detected["warning"]
+    assert detected["portretry_plugins"] == []
+
+
+@pytest.mark.parametrize(
+    ("identifier", "display_name"),
+    [("portretry", "PortRetry"), ("portretryplus", "PortRetryPlus")],
+)
+def test_detected_connection_warns_when_portretry_plugin_is_enabled(
+    plugin, identifier, display_name
+):
+    plugin_manager = mock.Mock()
+
+    def get_plugin_info(checked_identifier, **_):
+        return mock.Mock() if checked_identifier == identifier else None
+
+    plugin_manager.get_plugin_info.side_effect = get_plugin_info
+    with mock.patch(
+        "octoprint_autoconnectplus.octoprint.plugin.plugin_manager",
+        return_value=plugin_manager,
+    ):
+        detected = plugin._detected_connection()
+
+    assert detected["portretry_plugins"] == [display_name]
+    assert plugin_manager.get_plugin_info.call_count == 2
+
+
+def test_detected_connection_warns_when_both_portretry_plugins_are_enabled(
+    plugin,
+):
+    plugin_manager = mock.Mock()
+    plugin_manager.get_plugin_info.return_value = mock.Mock()
+    with mock.patch(
+        "octoprint_autoconnectplus.octoprint.plugin.plugin_manager",
+        return_value=plugin_manager,
+    ):
+        detected = plugin._detected_connection()
+
+    assert detected["portretry_plugins"] == ["PortRetry", "PortRetryPlus"]
+    assert plugin_manager.get_plugin_info.call_count == 2
 
 
 def test_detected_connection_connector_with_default_port(

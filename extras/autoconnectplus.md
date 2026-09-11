@@ -47,6 +47,12 @@ Offline printers are detected with a quick reachability probe and skipped
 quietly, and repeated failed attempts back off progressively instead of
 flooding the log.
 
+Only one automatic reconnect plugin should be active. AutoConnectPlus checks for
+both `portretry` (the original OctoPrint-PortRetry by vehystrix) and `portretryplus`
+(the OctoPrint-PortRetryPlus fork by hprombex). If either is enabled, it shows a
+permanent error toast immediately when the OctoPrint interface loads, because two
+reconnect plugins can compete for the same printer connection.
+
 AutoConnectPlus is a fork of [OctoPrint-PortRetryPlus](https://github.com/hprombex/OctoPrint-PortRetryPlus)
 by hprombex (with earlier work credited to vehystrix). The serial retry/timer
 logic is carried over; the connector support is new.
