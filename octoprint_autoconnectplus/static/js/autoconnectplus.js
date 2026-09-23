@@ -35,10 +35,6 @@ $(function () {
         });
     }
 
-    // Check immediately after the global plugin assets are ready, not only
-    // when the user opens the settings dialog.
-    checkPortRetryConflict();
-
     function AutoConnectPlusViewModel(parameters) {
         var self = this;
 
@@ -60,6 +56,13 @@ $(function () {
 
         self.onSettingsShown = function () {
             self.refreshDetected();
+        };
+
+        // Check on login, not only when the user opens the settings dialog.
+        // Not at DOM-ready: the client's base URL is not set yet then
+        // (requests go to /undefined/api/...) and the API needs a session.
+        self.onUserLoggedIn = function () {
+            checkPortRetryConflict();
         };
     }
 

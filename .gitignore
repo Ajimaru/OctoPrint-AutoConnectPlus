@@ -9,7 +9,3 @@ dist
 *.zip
 octoprint/*
 .venv/
-.vscode/
-.github/instructions/codacy.instructions.md
-.claude/
-CLAUDE.md
