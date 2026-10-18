@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - "v*"
+      # Bare numeric tags (0.2.0) are accepted too; the version guard below
+      # normalizes either form before comparing against pyproject.toml.
+      - "[0-9]*"
 
 permissions:
   contents: write # required to create a GitHub Release
@@ -123,13 +126,20 @@ jobs:
           git archive --format=zip --prefix=OctoPrint-AutoConnectPlus/ \
             -o dist/OctoPrint-AutoConnectPlus-latest.zip "$GITHUB_REF_NAME"
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+      - name: Create GitHub Release (draft)
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
           prerelease: ${{ steps.ver.outputs.prerelease }}
+          # Notes are grouped by PR label; the categories live in
+          # .github/release.yml.
           generate_release_notes: true
+          # Always a draft: a release is published by hand once the notes and
+          # the attached artifacts have been eyeballed. Pushing a tag must
+          # never publish on its own. The rolling "latest" release below is
+          # NOT a draft on purpose -- see the comment there.
+          draft: true
           files: |
             dist/*.whl
             dist/*.tar.gz
@@ -140,10 +150,14 @@ jobs:
       # Unlike GitHub's /releases/latest, this is updated on EVERY tag push,
       # so it tracks prereleases (rc/beta) too.
       - name: Update rolling "latest" release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           name: Latest
           tag_name: latest
+          # Deliberately NOT a draft, unlike the versioned release above: a
+          # draft's assets are not downloadable, which would break the stable
+          # URL below until someone published by hand.
+          draft: false
           # Always a prerelease: GitHub's /releases/latest API (which the
           # Software Update plugin's github_release check relies on) skips
           # prereleases, so the rolling pointer with its non-PEP440 tag
