@@ -16,7 +16,9 @@ jobs:
   # 1.x (serial-only fallback path) and 2.x (connector framework path).
   smoke:
     name: Smoke-test (OctoPrint ${{ matrix.label }})
-    runs-on: ubuntu-latest
+    # Pinned: this job runs Python 3.9 (the oldest supported version), which
+    # actions/setup-python no longer provides for ubuntu-latest (26.04).
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -73,7 +75,8 @@ jobs:
 
   release:
     name: Build and release
-    runs-on: ubuntu-latest
+    # Pinned for Python 3.9, same reason as the smoke job above.
+    runs-on: ubuntu-24.04
     needs: smoke # only publish once both OctoPrint generations pass
 
     steps:

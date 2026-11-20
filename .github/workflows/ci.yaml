@@ -31,14 +31,18 @@ jobs:
   # connector framework themselves, so they pass on 1.x (serial-only) too.
   test:
     name: Tests (OctoPrint ${{ matrix.label }}, Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           # Oldest and newest supported Python against the stable 1.x line.
+          # actions/setup-python has no Python 3.9 for ubuntu-latest (26.04)
+          # any more, only up to 24.04 - but 3.9 stays supported
+          # (requires-python, OctoPi images on Debian Bullseye run it).
           - label: "1.x"
             python: "3.9"
+            runner: ubuntu-24.04
             octoprint: "OctoPrint>=1.11,<2"
             pre: ""
             blocking: true
