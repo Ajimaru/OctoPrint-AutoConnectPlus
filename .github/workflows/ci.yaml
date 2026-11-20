@@ -47,13 +47,15 @@ jobs:
             octoprint: "OctoPrint>=1.11,<2"
             pre: ""
             blocking: true
-          # 2.0 is only published as a prerelease for now; non-blocking until
-          # a stable 2.0 is out (mirrors the release workflow's smoke test).
+          # Stable 2.x (2.0.0 shipped 2026-11-16). Blocking like 1.x: it also
+          # runs tests/test_import_guard.py, which fails if the plugin loses
+          # its connector support to OctoPrint's circular import - or reports
+          # (strict XPASS) that OctoPrint fixed it and the workaround can go.
           - label: "2.x"
             python: "3.12"
-            octoprint: "OctoPrint>=2.0.0rc1"
-            pre: "--pre"
-            blocking: false
+            octoprint: "OctoPrint>=2,<3"
+            pre: ""
+            blocking: true
 
     steps:
       - name: Checkout
