@@ -16,26 +16,29 @@ jobs:
   # 1.x (serial-only fallback path) and 2.x (connector framework path).
   smoke:
     name: Smoke-test (OctoPrint ${{ matrix.label }})
-    runs-on: ubuntu-latest
+    # Pinned: this job runs Python 3.9 (the oldest supported version), which
+    # actions/setup-python no longer provides for ubuntu-latest (26.04).
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          # PyPI "latest stable" is still the 1.x line; pin it explicitly.
-          # This is the gating leg: a failure here blocks the release.
+          # Both generations are pinned explicitly and both gate the release:
+          # a failure in either leg blocks it.
           - label: "1.x"
             octoprint: "OctoPrint>=1.11,<2"
             pre: ""
             blocking: true
-          # 2.0 is only published as a prerelease for now, so allow --pre.
-          # The plugin sidesteps the rc* circular-import bug (octoprint.printer
-          # <-> octoprint.filemanager) itself, so this leg should pass; still
-          # non-blocking so a new, unstable rc can never block a release. Flip
-          # to blocking once 2.0 stable is out.
+            connectors: "False"
+          # Stable 2.x (2.0.0 shipped 2026-11-16). OctoPrint's circular import
+          # (octoprint.printer <-> octoprint.filemanager) is still present in
+          # 2.0.1; the plugin sidesteps it, and the smoke test below checks
+          # that the connector framework really survives a fresh import.
           - label: "2.x"
-            octoprint: "OctoPrint>=2.0.0rc1"
-            pre: "--pre"
-            blocking: false
+            octoprint: "OctoPrint>=2,<3"
+            pre: ""
+            blocking: true
+            connectors: "True"
 
     steps:
       - name: Checkout
@@ -65,11 +68,15 @@ jobs:
           /tmp/smoke/bin/pip install ${{ matrix.pre }} "${{ matrix.octoprint }}"
           /tmp/smoke/bin/pip install dist/*.whl
           /tmp/smoke/bin/python -c "import octoprint_autoconnectplus; print('import OK')"
+          # ConnectedPrinter is None on 1.x by design; on 2.x a None means the
+          # circular-import workaround failed and connector support is gone.
+          /tmp/smoke/bin/python -c "import octoprint_autoconnectplus as p; found = p.ConnectedPrinter is not None; print('connector framework', found); assert found == ${{ matrix.connectors }}"
           /tmp/smoke/bin/python -c "from importlib.metadata import version; print('installed version', version('OctoPrint-AutoConnectPlus'))"
 
   release:
     name: Build and release
-    runs-on: ubuntu-latest
+    # Pinned for Python 3.9, same reason as the smoke job above.
+    runs-on: ubuntu-24.04
     needs: smoke # only publish once both OctoPrint generations pass
 
     steps:

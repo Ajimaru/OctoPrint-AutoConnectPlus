@@ -29,10 +29,15 @@ if TYPE_CHECKING:
     from octoprint.printer.profile import PrinterProfileManager
 
 # Connector framework only exists on OctoPrint 2.0+; on older versions the
-# import fails and we fall back to serial-only behaviour. The filemanager
-# import works around a circular import in OctoPrint 2.0.0rc* (importing
-# octoprint.printer.* before octoprint.filemanager trips the cycle); it is
-# harmless on versions where the cycle is fixed or OctoPrint already runs.
+# import fails and we fall back to serial-only behaviour.
+#
+# The filemanager import works around a circular import that is still present
+# in OctoPrint 2.0.1 stable: octoprint.printer imports octoprint.filemanager,
+# whose storage.printer module imports PrinterFile back from the half-loaded
+# octoprint.printer. Do not remove it: the cycle surfaces as an ImportError,
+# which the except below would take for OctoPrint 1.x and silently disable all
+# connector support. tests/test_import_guard.py catches both a removal and the
+# day OctoPrint fixes the cycle; it is harmless on versions without the cycle.
 try:
     import octoprint.filemanager  # noqa: F401
     from octoprint.printer.connection import ConnectedPrinter

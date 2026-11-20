@@ -31,14 +31,18 @@ jobs:
   # connector framework themselves, so they pass on 1.x (serial-only) too.
   test:
     name: Tests (OctoPrint ${{ matrix.label }}, Python ${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           # Oldest and newest supported Python against the stable 1.x line.
+          # actions/setup-python has no Python 3.9 for ubuntu-latest (26.04)
+          # any more, only up to 24.04 - but 3.9 stays supported
+          # (requires-python, OctoPi images on Debian Bullseye run it).
           - label: "1.x"
             python: "3.9"
+            runner: ubuntu-24.04
             octoprint: "OctoPrint>=1.11,<2"
             pre: ""
             blocking: true
@@ -47,13 +51,15 @@ jobs:
             octoprint: "OctoPrint>=1.11,<2"
             pre: ""
             blocking: true
-          # 2.0 is only published as a prerelease for now; non-blocking until
-          # a stable 2.0 is out (mirrors the release workflow's smoke test).
+          # Stable 2.x (2.0.0 shipped 2026-11-16). Blocking like 1.x: it also
+          # runs tests/test_import_guard.py, which fails if the plugin loses
+          # its connector support to OctoPrint's circular import - or reports
+          # (strict XPASS) that OctoPrint fixed it and the workaround can go.
           - label: "2.x"
             python: "3.12"
-            octoprint: "OctoPrint>=2.0.0rc1"
-            pre: "--pre"
-            blocking: false
+            octoprint: "OctoPrint>=2,<3"
+            pre: ""
+            blocking: true
 
     steps:
       - name: Checkout
